@@ -1,0 +1,347 @@
+# Vend — Squad Hackathon 3.0 Build Spec
+
+*Working reference for the Challenge 02 build. Personal guide and AI context source. Edit as the build evolves. Pair with `vend_master_context.md` — that document is the strategy; this one is the sprint.*
+
+---
+
+## 1. Context in one paragraph
+
+Vend is competing in Squad Hackathon 3.0, Challenge 02 ("Smart Systems: The Intelligent Economy"). The challenge prompt asks for an intelligent economic system connecting informal traders, job seekers, and financial services. Vend's existing positioning — financial OS for campus micro-merchants, formalization-as-journey, Squad-powered virtual accounts, AI for trust and categorization — maps directly onto the brief. The hackathon is being run as a **parallel sprint**, not as Vend's actual launch. The goal is to win the prize (which funds Vend's scaling phase) by demonstrating the founding loop of the real product, not to ship Vend's MVP. Submission deadline is May 15, 2026. Build time is 8 days, effectively solo.
+
+## 2. The strategic frame for Challenge 02
+
+The challenge prompt names three groups: informal traders, job seekers, and financial services. Vend serves the first and third directly. The second is handled by **reframing job seekers as income seekers**: on a Nigerian campus, students don't apply for jobs, they start side hustles. Vend turns income seekers into earners by giving them the rails to start transacting the day they decide to. This is intellectually honest and stays true to the settled product strategy.
+
+What this means in practice: **do not build a job board, do not build a service-ordering marketplace ("order a haircut to your hostel"), do not pivot toward Business A.** The marketplace as already scoped (a directory of trust-scored sellers buyers can browse and pay through escrow) is sufficient discovery infrastructure to satisfy the "matching" pillar of the prompt. It does not need to be expanded for the hackathon.
+
+## 3. Judging criteria, mapped
+
+| Criterion | Weight | How we score on it |
+|---|---|---|
+| Squad API Integration | 25% | Squad virtual accounts, payment processing, and webhooks are the literal backbone of the demo. Wrapped behind a `PaymentProvider` interface so the architecture point is visible in code. |
+| Technical Architecture | 20% | Clean Next.js + Supabase + Squad. AI layer (Claude) doing real work in transaction categorization and dashboard summaries, not bolted on. Provider abstraction shows we've thought about resilience. |
+| Problem Understanding & Innovation | 20% | Specific user (UNILAG braiders, tutors, tailors), real naira figures, the formalization-as-journey thesis, the income-seeker reframe. User quotes from in-person interviews if teammate delivers. |
+| Economic Viability & Scalability | 20% | Tier architecture (Informal → Verified → Registered) shows the path beyond MVP. Lending partner narrative for credit. Multi-campus playbook. National scale by serving informal economy beyond campus. |
+| Presentation & Communication | 15% | Demo rehearsed and stable. Working live, not recorded if possible. Pitch follows the brief's slide order exactly. |
+| Impact Potential (bonus) | 10% | Tens of millions of informal workers in Nigeria, billions globally. Realistic Year 1 number tied to UNILAG cohort, then expansion. |
+
+**Disqualification trigger to avoid:** "A solution with no meaningful Squad API integration will not be eligible for top placements." Squad must be doing actual work in the demo, not appearing on a slide.
+
+## 4. The build — seven-step demo loop
+
+This is the entire build. Everything outside this list is on slides, not in code.
+
+1. **Seller signup.** Form fields: business name (display, e.g. "Tomi's Braids"), legal first/middle/last name (must match BVN), phone, email, BVN, DOB, gender, address, "what do you do?" (free-form text). Helper text on the legal name field: *"Must match your BVN. Customers will see your business name, not this."* Every seller onboards directly to Verified tier — see Section 6A for why.
+2. **Virtual account provisioning.** On signup completion, call Squad's `/virtual-account` (Customer model) with the legal identity + BVN. Store the returned virtual account number, bank code, and customer_identifier. Display to seller alongside their business name.
+3. **Payment surface.** Seller sees a page with their virtual account number, a shareable payment link (`vend.app/pay/[seller-id]`), and a QR code that encodes the same link.
+4. **Customer payment.** Buyer (a second device during the demo) opens the payment link, enters an amount, pays via Squad's hosted checkout. In the demo, payment is via card or transfer — whatever the Squad sandbox supports most reliably.
+5. **Webhook + dashboard.** Squad fires a webhook to our endpoint. Transaction is written to Supabase, categorized by Claude, and appears in the seller's dashboard within seconds. Dashboard shows: total inflow, transaction list, weekly summary line generated by Claude.
+6. **Receipt generation.** Server-side, the transaction triggers receipt creation. Receipt is delivered to payer via email (Resend) and accessible at a public verification URL: `vend.app/verify/[code]`.
+7. **AI layer (visible in two places).** (a) Transaction categorization on webhook ingest — Claude reads the seller's "what do you do" text and any payment description, returns a category. (b) Weekly dashboard summary — Claude generates a one-sentence summary when seller opens the dashboard ("This week you earned ₦47,000 across 12 transactions — your busiest day was Saturday").
+
+**What's NOT in the build:**
+- Tier upgrades (slide only)
+- Trust score computation (static number on dashboard, explanation on slide)
+- Marketplace browsing (slide only)
+- Collections feature (slide only)
+- Anti-fraud beyond Squad's built-in checks (slide only)
+- Embedded credit / lending partners (slide only — see Section 11)
+- Receipt template customization (one default template, no picker)
+- WhatsApp or SMS delivery (email only)
+- BVN/NIN verification (slide only — would unlock Verified tier)
+
+If everything above works and there's time left, the highest-value addition is **logo upload + accent color picker for the receipt**, drawn from a curated palette. Not before.
+
+## 5. Stack
+
+- **Framework:** Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui
+- **Database + Auth:** Supabase (Postgres + Auth in one — saves hours)
+- **Payments:** Squad sandbox REST API, wrapped behind a `PaymentProvider` TypeScript interface
+- **AI:** Anthropic API (Claude) for categorization and summaries
+- **Email:** Resend for receipt delivery
+- **Hosting:** Vercel
+- **Repo:** GitHub, public, README with setup instructions clean enough for a judge to reproduce
+
+Single Next.js project. No separate Python service. No microservices. No exotic frameworks. Boring tools fast.
+
+## 6. Data model (Supabase)
+
+### 6A. The tier reality (read this first)
+
+Squad's `/virtual-account` (Customer model) endpoint requires BVN with strict validation against name, DOB, gender, and phone. There is no path to a virtual account without identity verification. This means **the Informal tier as defined in master context Section 3 cannot be built on Squad** — it would need a different rail (e.g., Squad payment links without virtual accounts), which is not in scope for the hackathon.
+
+For the demo, every seller onboards directly to Vend's **Verified tier**. The schema retains `'informal'` as a documented future state but `'verified'` is the default for the demo. The pitch frames this honestly: BVN-gated entry is the standard for any virtual account in Nigeria, and we've designed the sign-up to make it feel light, not bureaucratic.
+
+The **business name vs. legal name** split: Squad knows the seller by legal BVN-verified identity (required by CBN guidelines). Vend shows the seller's business name everywhere customer-facing — payment page, receipts, dashboard. Two names, two purposes, both stored. When a seller eventually upgrades to Registered tier (post-hackathon, requires Squad merchant profiling for the Business model endpoint), the virtual account itself moves to the business name. For the demo, only Customer model is in play.
+
+### 6B. Schema
+
+Minimum viable schema. Add columns as needed during the build, don't pre-optimize.
+
+```sql
+-- Sellers (the people using Vend)
+sellers (
+  id uuid primary key,
+  user_id uuid references auth.users,           -- Supabase auth
+  business_name text not null,                  -- "Tomi's Braids" — displayed to customers
+  legal_first_name text not null,               -- must match BVN
+  legal_middle_name text not null,              -- must match BVN
+  legal_last_name text not null,                -- must match BVN
+  phone text not null,                          -- 11 digits, e.g. 08012345678
+  email text not null,
+  bvn text not null,                            -- sent to Squad, never displayed
+  date_of_birth date not null,                  -- mm/dd/yyyy when sent to Squad
+  gender text not null,                         -- '1' male, '2' female (Squad's format)
+  address text not null,
+  business_description text not null,           -- "what do you do?" free-form
+  tier text not null default 'verified',        -- 'verified' | 'registered' (informal documented but unused)
+  squad_virtual_account_number text,
+  squad_bank_code text,                         -- '058' = GTBank
+  squad_customer_identifier text unique,        -- Vend-generated, sent to Squad as ID
+  trust_score numeric default 0,                -- static for demo
+  created_at timestamptz default now()
+)
+
+-- Transactions (every payment that lands)
+transactions (
+  id uuid primary key,
+  seller_id uuid references sellers,
+  squad_transaction_ref text unique,     -- idempotency key on webhook
+  amount_kobo bigint not null,           -- always store in kobo, format on display
+  payer_name text,
+  payer_email text,
+  description text,                      -- from payment metadata if present
+  ai_category text,                      -- filled by Claude post-ingest
+  status text not null,                  -- 'success' | 'failed' | 'pending'
+  created_at timestamptz default now()
+)
+
+-- Receipts
+receipts (
+  id uuid primary key,
+  transaction_id uuid references transactions unique,
+  verification_code text unique not null, -- short, URL-safe (e.g. 'V7K2X9')
+  delivered_to text,                      -- email address it was sent to
+  delivered_at timestamptz,
+  created_at timestamptz default now()
+)
+```
+
+Notes:
+- Store amounts in **kobo** (integer), never in naira floats. Format on display only.
+- The `squad_transaction_ref` unique constraint is the idempotency guard for webhook replays. Squad will retry; we must handle.
+- Verification codes: short, uppercase, no ambiguous characters (no 0/O/1/I/L). Six characters is fine for a demo. Generate with `nanoid` using a custom alphabet.
+- `squad_customer_identifier` is **our** unique ID for the seller, sent to Squad on virtual account creation. Squad echoes it back on every webhook so we can resolve the transaction to a seller. Use the seller's `id` (uuid) prefixed with `vend_` or similar — short, unique, alphanumeric.
+- BVN is sensitive. Never log it, never display it after entry, store with column-level encryption if Supabase supports it on free tier; otherwise document as a known gap in the README and treat it as a v2 hardening task.
+- Sandbox BVNs: Squad's sandbox accepts test BVNs that don't validate against the real BVN portal. Find the test data section in their docs or dashboard for valid sandbox values. Do not use real people's BVNs in development.
+
+## 7. Squad integration — the contract
+
+Wrap everything behind this interface from day one (Section 3 of master context — non-negotiable, even at hackathon speed). Squad is the first implementation, not the only.
+
+```typescript
+// lib/payments/types.ts
+interface PaymentProvider {
+  createVirtualAccount(input: {
+    sellerId: string;
+    sellerName: string;
+    sellerPhone: string;
+  }): Promise<{ accountNumber: string; reference: string }>;
+
+  createPaymentLink(input: {
+    sellerId: string;
+    amountKobo?: number;  // optional — buyer enters if absent
+    description?: string;
+  }): Promise<{ url: string; reference: string }>;
+
+  verifyWebhook(payload: unknown, signature: string): boolean;
+
+  parseWebhook(payload: unknown): {
+    eventType: 'payment.success' | 'payment.failed' | 'other';
+    transactionRef: string;
+    amountKobo: number;
+    payerName?: string;
+    payerEmail?: string;
+    description?: string;
+    sellerReference?: string;  // maps back to our seller
+  };
+}
+
+// lib/payments/squad.ts — implements PaymentProvider
+// lib/payments/mock.ts — implements PaymentProvider for local dev
+```
+
+This abstraction takes maybe 30 minutes to set up properly and pays back every time you test locally without burning Squad sandbox calls.
+
+**Squad endpoints we'll touch (verified against docs):**
+- `POST /virtual-account` — Customer model, creates virtual account (requires BVN match)
+- `POST /virtual-account/simulate/payment` — Sandbox-only, simulates inbound payment to trigger webhook flow without real money
+- `GET /virtual-account/customer/transactions/{customer_identifier}` — Defensive re-fetch on webhook to confirm transaction
+- Webhook receiver (we expose; Squad calls) — HMAC-SHA512 v3 signature, hash 6 piped fields with secret key
+- Auth pattern: `Authorization: Bearer sandbox_sk_...` header on every request
+- Base URL: `https://sandbox-api-d.squadco.com` (production: `https://api-d.squadco.com`)
+
+**Webhook v3 signature verification (the contract):**
+```
+hashInput = `${transaction_reference}|${virtual_account_number}|${currency}|${principal_amount}|${settled_amount}|${customer_identifier}`
+expectedSignature = HMAC-SHA512(hashInput, SQUAD_SECRET_KEY).hex()
+verify by comparing expectedSignature === request.headers['x-squad-signature']
+```
+If they don't match, return 400 and ignore the request. Never trust an unsigned webhook payload.
+
+## 8. Day-by-day plan
+
+Treating May 14 EOD as the real deadline. Today is May 7.
+
+| Day | Date | Goal | Done = |
+|---|---|---|---|
+| 1 | May 7 | Squad sandbox account live, docs read, virtual account creation working via curl/Postman | ✅ **DONE May 8** — sandbox account live, docs read end-to-end, virtual account created from script (`6676146167`), sandbox does not validate BVN content, beneficiary_account is required despite docs |
+| 2 | May 8 | `PaymentProvider` interface scaffolded, Squad implementation working, mock implementation working | Calling `createVirtualAccount` from a Node script returns valid data from both impls |
+| 3 | May 9 | Next.js project, Supabase wired, signup → virtual account creation working in UI | Can sign up, see my virtual account number on screen |
+| 4 | May 10 | Payment link page, webhook handler, transaction ingestion | Pay via sandbox link → transaction lands in DB within 5 seconds |
+| 5 | May 11 | Dashboard with transactions, receipt generation, public verify URL | Can pay, see transaction in dashboard, receive receipt email, click verify link |
+| 6 | May 12 | Claude categorization, dashboard weekly summary, visual design pass | Demo looks like Vend, not like a hackathon project |
+| 7 | May 13 | 10-slide pitch deck, one-pager PDF, GitHub README, demo rehearsal x3 | Can run the full 5-min demo without notes |
+| 8 | May 14 | Buffer day. Fix what broke. Final rehearsals. | Submitted. |
+
+**Hard rule:** if a day's goal slips, cut from the build, don't extend the day. The demo working end-to-end matters more than any single feature.
+
+## 9. The teammate
+
+If they don't know much code, do not put them on critical path. Two assignments, in priority order:
+
+1. **User research at UNILAG.** Send them with a written script and your phone number. Goal: 5 in-person seller conversations, recorded with permission, transcribed quotes brought back. Addresses the rubric's "have we spoken to at least 3 real people from our target community?" Quotes from real sellers in the pitch will distinguish us from every team that built theoretical.
+2. **Pitch deck and one-pager.** Slide content, design, rehearsal. Useful to have a fresh pair of eyes on the narrative.
+
+If only one is possible, it's the user research. Founder-goes-to-ground (Section 5 of master context) — this is that, with help.
+
+## 10. Visual design tokens
+
+Opinionated. Lock these on Day 6, don't relitigate.
+
+**Color palette:**
+- Primary: `#0F4C3A` (deep desaturated green — money/growth without the obvious fintech blue)
+- Primary hover: `#1B5E47`
+- Surface: `#FAF7F2` (warm off-white — distinguishes from cold-white default)
+- Background: `#FFFFFF`
+- Text primary: `#0A0A0A` (true black)
+- Text secondary: `#6B6B6B` (warm gray, not blue-gray)
+- Border: `#E8E4DD`
+- Error: `#B91C1C`
+- Warning: `#B45309`
+- Success: same as primary green (the brand color *is* the success state — reinforces "Vend = things working")
+
+**Typography:**
+- UI: Inter (variable). Already on Vercel/shadcn defaults.
+- Numerals: tabular figures wherever amounts are displayed (`font-feature-settings: "tnum"`). Money should never reflow.
+
+**Spacing/components:**
+- Default to shadcn/ui components. Don't restyle them aggressively.
+- Receipts: serif for the seller's business name (subtle institutional weight), Inter for everything else. One default template.
+- Dashboard: data-dense, clean. Resist the urge to add charts that aren't earning their pixels.
+
+**What to avoid:** purple-to-pink gradients, pastel anything, generic fintech blue, playful illustrations, emoji as UI elements.
+
+## 11. Pitch deck — slide-by-slide content
+
+Following the hackathon brief's exact structure. 10 slides max.
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Problem | Nigeria's invisible economy: informal businesses generating billions, invisible to financial system. Specific stat: 90%+ of campus businesses operate without formalization. Why now: youth unemployment + payment infrastructure maturity. |
+| 2 | Target User | The UNILAG braider making ₦200k/month from her hostel room. Real photo, real name (with permission), real quote from teammate's research. The income seeker, not the job seeker. |
+| 3 | Solution Overview | Vend: financial OS for informal merchants. Three-tier journey (Informal → Verified → Registered). Show the seven-step demo loop visually. |
+| 4 | Squad API Integration | Virtual accounts (each seller gets one), hosted checkout for payment collection, webhooks for real-time visibility. Show the architecture diagram. Emphasize: Squad isn't bolted on, it's the spine. |
+| 5 | AI / Data Intelligence | Claude categorizes every transaction. Claude generates dashboard summaries. AI signals feed the trust score. Setup-time vs runtime AI distinction (Section 3 of master context). |
+| 6 | User Flow | Walk through the demo loop — this is where we show the live demo. Five minutes. |
+| 7 | Impact Potential | UNILAG: ~50k students, ~5k active micro-merchants. Year 1 target: 1,000 onboarded. National scale: tens of millions in Nigeria's informal economy. Be specific with numbers. |
+| 8 | Scalability & Business Model | Payment processing fees, SaaS subscription for Verified+, registration services revenue, lending referral revenue (partner-based — see Section 12). Multi-campus playbook. |
+| 9 | Research & Validation | Teammate's UNILAG quotes. Naira figures from real sellers. The "why now" convergence. |
+| 10 | The Team | Solo founder + one teammate. Why this team: founder-goes-to-ground commitment, Lagos-based, building from inside the user's environment. |
+
+The brief's slide list has two slide-7s and two slide-8s in the document — I've collapsed them into a clean 10. If they hold us strictly to the original numbering on the day, we adjust live.
+
+## 12. Future-product narrative for the pitch (not built)
+
+These come up on slides only. Be ready to defend each:
+
+- **Tier upgrades.** Verified (BVN/NIN-confirmed, higher limits, custom display name) → Registered (CAC LTD, custom business name, embedded credit access). Real upgrade paths, real unlocked benefits. Not vanity badges.
+- **Trust score.** Interpretable signals: payment regularity, dispute rate, customer reviews (with AI-checked authenticity), time on platform. Explicitly NOT a black box.
+- **Collections.** Group-payment surface for treasurers, class reps, event organizers. Vend's viral growth loop. Drops dozens of payers into ecosystem per collection. Launches month 3-6 of real product.
+- **Lending partnerships.** Vend as origination layer; licensed lender takes credit risk. Candidates: Lendsqr, Indicina, Carbon's white-label, Mono. Year 2 unlock when ~1,000 Verified-tier sellers have ≥3 months data. Vend never holds the loan book itself — Section 5 of master context, "don't build what you can partner for."
+- **Marketplace.** Discovery layer with escrow + OTP-verified delivery. Feature of Vend, not its purpose. Sellers find buyers; buyers verify trust before paying. Settled — do not let questions drift toward "Vend as Chowdeck."
+
+## 13. Things I will be tempted to add and must not
+
+- Leaderboards, gamification, streaks, badges. (Vend is infrastructure, not entertainment — Section 5 of master context.)
+- A buyer-side service ordering flow ("order a haircut to your hostel"). This is Business A and we are not Business A.
+- Receipt template designer, font picker, drag-and-drop customization. Out of scope per receipt feature brief.
+- White-labeling. Vend attribution is non-removable.
+- Multiple payment provider implementations beyond the mock. Squad is the v1 commitment.
+- A trained ML model for fraud or trust. Heuristics + Claude is more honest at this stage; pretending we trained a model in a weekend gets caught.
+- Mobile-native build. Web-responsive only. Native apps come later, not now.
+
+## 14. The self-assessment rubric (from the brief), pre-filled
+
+Honest scoring as of May 7. Re-score on May 13.
+
+| Question | Target Score | Notes |
+|---|---|---|
+| End-to-end demo without breaking | 5 | Day 8 buffer exists for this |
+| Meaningful Squad API integration | 5 | Spine of the product |
+| Codebase clean and documented | 4 | README is Day 7 work |
+| Reproducible from repo | 4 | `.env.example`, setup instructions |
+| Target user named with specificity | 5 | Hero archetype is settled |
+| Spoken to ≥3 real users | 5 if teammate delivers, 2 if not | Critical |
+| Problem proven with data/quotes | 4–5 | Naira figures are real |
+| Built for someone, not about | 5 | Founder-goes-to-ground |
+| AI Automation genuinely automates | 4 | Categorization + summaries |
+| Use of Data predictive/ethical | 4 | Trust signals are real signals |
+| Squad APIs core, not token | 5 | Already true |
+| Genuine financial innovation | 5 | Formalization-as-journey is novel |
+| AI makes product smarter | 4 | Real work, not decorative |
+| Can explain model in plain language | 5 | Heuristics + Claude — explainable |
+| Bias/fairness considered | 3 | Need to add a slide bullet |
+| Gets better with more data | 4 | Trust score improves with volume |
+| Year 1 reach articulated | 5 | 1,000 sellers UNILAG |
+| Path to sustainability | 5 | Multi-stream business model |
+| Works outside immediate city | 4 | Multi-campus playbook |
+| Measurably different from existing | 5 | Nothing else does this for this user |
+| Demo rehearsed and stable | depends on Day 7-8 | |
+| Every team member has clear role | 4 | Two-person team, clear split |
+| Can answer "why Squad APIs?" | 5 | Already answered |
+| One-pager hand-to-judge ready | depends on Day 7 | |
+
+Estimated current trajectory: 85+ if execution holds. The variables are user research, demo stability, and the bias/fairness slide.
+
+## 15. Open questions (resolve before they block)
+
+- **Sandbox BVN test data.** Need valid sandbox BVN values. Check Squad dashboard / docs for test data section, or contact their support if not documented.
+- **GTBank settlement account.** Squad requires a GTBank account as settlement target for production. Sandbox: not needed (settles to wallet T+1). Real product: founder needs a GTBank business account in the LTD's name. Add to Section 8 master context.
+- **Email deliverability for receipts.** Resend free tier should be fine for demo volume but verify domain setup time.
+- **Demo Wi-Fi reliability on stage.** If venue has bad connectivity, have a recorded fallback demo per the brief: *"live is preferred, but a recorded walkthrough is accepted."*
+- **Bias/fairness slide content.** Need one substantive bullet — likely about ensuring the trust score doesn't disadvantage new sellers (cold-start fairness) and that AI categorization doesn't penalize unconventional business descriptions.
+- **Payment links endpoint** (Squad Payments docs, not yet read). Worth fetching to confirm whether the demo needs them at all, or if virtual account + simulate-payment is enough.
+
+**Resolved:**
+- Squad sandbox base URL: `https://sandbox-api-d.squadco.com` ✓
+- Auth: Bearer `sandbox_sk_...` ✓
+- Virtual account creation requires BVN — Informal tier blocked on Squad ✓
+- Webhook signature: HMAC-SHA512 v3, 6 piped fields ✓
+- Sandbox payment simulation endpoint exists — no real money needed for demo ✓
+- **Sandbox does NOT validate BVN content** — any 11-digit number is accepted. This means we can build the full demo without real test BVN data. **Production will validate strictly against the BVN portal.** ✓
+- **`beneficiary_account` is required by sandbox** despite docs saying optional. Dummy GTBank-shaped number (`0000000000`) is accepted in sandbox. Production will require a real GTBank account; for Vend post-LTD, this becomes Vend's own LTD GTBank settlement account, with internal redistribution by `customer_identifier`. ✓
+- **Email field validates basic format** — sandbox rejects `.local` TLDs and similar. Use real-format emails (e.g. `@example.com`) for test data. ✓
+- **First successful virtual account created May 8, 2026.** Phase 1 complete. ✓
+
+## 16. After the hackathon
+
+Win or lose, post-May 15:
+- Do not let the hackathon code become Vend's production code by default. Decide deliberately.
+- Resume the real Section 8 work in master context: register LTD, talk to 15 sellers in person, set up Squad production (not sandbox) account.
+- The user research conducted by the teammate during the hackathon is real Vend research — keep the recordings, file the quotes.
+- If we win, the prize money goes toward LTD registration + production Squad onboarding + first cohort acquisition, not toward expanding the hackathon codebase.
+
+---
+
+*End of build spec. Refer back as the build progresses. Update Section 8 (day-by-day) as days complete. Update Section 15 (open questions) as items resolve. Everything else should stay stable through the sprint.*
