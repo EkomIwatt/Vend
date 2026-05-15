@@ -51,8 +51,12 @@ export default async function PayPage({ params }: Props) {
             <span className="bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-wide font-medium">
               {seller.tier}
             </span>
-            <span className="text-ink-muted">
-              Trust score · <span className="tnum">{Number(seller.trust_score ?? 0)}</span>
+            <span
+              className="bg-primary text-white px-2 py-0.5 rounded uppercase tracking-wide font-medium tnum"
+              title="Vend trust score — combines payment regularity, time on platform, and customer reviews."
+            >
+              Trust {Number(seller.trust_score ?? 0).toFixed(1)}
+              <span className="opacity-60">/10</span>
             </span>
           </div>
         </div>

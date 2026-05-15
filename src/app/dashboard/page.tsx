@@ -97,16 +97,24 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen p-6 sm:p-10">
       <div className="max-w-3xl mx-auto space-y-8">
-        <header className="flex items-baseline justify-between">
+        <header className="flex items-baseline justify-between gap-4">
           <div>
             <p className="text-sm text-ink-muted">Vend</p>
             <h1 className="font-serif text-3xl tracking-tight mt-1">
               {seller.business_name}
             </h1>
           </div>
-          <span className="text-xs uppercase tracking-wide bg-primary/10 text-primary px-2.5 py-1 rounded-md font-medium">
-            {seller.tier}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs uppercase tracking-wide bg-primary/10 text-primary px-2.5 py-1 rounded-md font-medium">
+              {seller.tier}
+            </span>
+            <span
+              className="text-xs uppercase tracking-wide bg-primary text-white px-2.5 py-1 rounded-md font-medium tnum"
+              title="Trust score combines payment regularity, time on Vend, and customer reviews. Buyers see this on your payment page."
+            >
+              Trust {Number(seller.trust_score ?? 0).toFixed(1)}
+            </span>
+          </div>
         </header>
 
         {/* AI weekly summary banner */}

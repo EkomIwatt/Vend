@@ -160,7 +160,12 @@ export async function POST(request: Request) {
   // explicitly), then Squad's payload, then null.
   const payerName = pending?.payer_name ?? parsed.payerName ?? null
   const payerEmail = pending?.payer_email ?? parsed.payerEmail ?? null
-  const description = pending?.payer_description ?? parsed.description ?? null
+  // Deliberately do NOT fall back to parsed.description: Squad's webhook
+  // `remarks` field is auto-generated ("Transfer from <legal_name> to sandbox
+  // | [<customer_identifier>]") and would leak the seller's BVN-matched
+  // legal name onto the dashboard. The only description we trust is the one
+  // the buyer typed on the /pay form, which lands here via pending_payments.
+  const description = pending?.payer_description ?? null
 
   const { data: inserted, error: insertError } = await admin
     .from('transactions')
