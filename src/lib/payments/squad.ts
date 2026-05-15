@@ -153,31 +153,54 @@ export class SquadProvider implements PaymentProvider {
 
   parseWebhook(payload: unknown): ParsedWebhook {
     const p = payload as Record<string, any>
-    // Squad's webhook body is typically { event, transaction_reference, ... }
-    // at the top level, or wrapped in { data: {...} }. Handle both.
-    const data = p?.data ?? p
+    // Squad's webhook body shapes seen in the wild:
+    //   - { Event, TransactionRef, Body: { ... } } — card charge style
+    //   - { event, data: { ... } } — generic v3 style
+    //   - flat { transaction_reference, virtual_account_number, ... } — virtual account inbound
+    const data = (p?.Body ?? p?.data ?? p) as Record<string, any>
 
     const principalKobo = nairaStringToKobo(
-      data.principal_amount ?? data.transaction_amount ?? '0',
+      data.principal_amount ?? data.amount ?? data.transaction_amount ?? '0',
     )
-    const settledKobo = nairaStringToKobo(data.settled_amount ?? data.principal_amount ?? '0')
-
-    // We treat principal_amount as the displayed amount (what payer paid).
+    const settledKobo = nairaStringToKobo(
+      data.settled_amount ?? data.merchant_amount ?? data.principal_amount ?? '0',
+    )
     const amountKobo = principalKobo || settledKobo
 
-    const eventType: ParsedWebhook['eventType'] =
-      data.transaction_status === 'success' || p.event === 'payment.success'
+    const transactionRef = String(
+      data.transaction_reference ??
+        p.TransactionRef ??
+        data.transaction_ref ??
+        p.transaction_ref ??
+        '',
+    )
+
+    // Success detection. Squad's virtual-account inbound webhooks frequently
+    // have NO event/status field — they're only fired when money lands.
+    // So: explicit success-ish strings win; otherwise infer from "ref + amount"
+    // presence; only mark failed if there's an explicit failed signal.
+    const eventStr = String(p.Event ?? p.event ?? '').toLowerCase()
+    const statusStr = String(data.transaction_status ?? data.status ?? '').toLowerCase()
+    const isFailed = eventStr.includes('fail') || statusStr === 'failed'
+    const isExplicitSuccess =
+      eventStr.includes('success') ||
+      statusStr === 'success' ||
+      statusStr === 'successful'
+    const isImpliedSuccess =
+      !eventStr && !statusStr && transactionRef.length > 0 && amountKobo > 0
+
+    const eventType: ParsedWebhook['eventType'] = isFailed
+      ? 'payment.failed'
+      : isExplicitSuccess || isImpliedSuccess
         ? 'payment.success'
-        : data.transaction_status === 'failed' || p.event === 'payment.failed'
-          ? 'payment.failed'
-          : 'other'
+        : 'other'
 
     return {
       eventType,
-      transactionRef: String(data.transaction_reference ?? ''),
+      transactionRef,
       amountKobo,
-      payerName: data.payer_name ?? data.sender_name ?? undefined,
-      payerEmail: data.payer_email ?? undefined,
+      payerName: data.payer_name ?? data.sender_name ?? data.customer_name ?? undefined,
+      payerEmail: data.payer_email ?? data.email ?? undefined,
       description: data.remarks ?? data.description ?? undefined,
       customerIdentifier: String(data.customer_identifier ?? ''),
       virtualAccountNumber: String(data.virtual_account_number ?? ''),

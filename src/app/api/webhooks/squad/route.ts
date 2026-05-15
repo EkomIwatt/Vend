@@ -52,6 +52,22 @@ export async function POST(request: Request) {
   }
   const parsed = paymentProvider.parseWebhook(payload)
 
+  // Diagnostic log — top-level body keys + key parsed fields. Helps us learn
+  // Squad's webhook shape without dumping sensitive content.
+  console.log(
+    '[webhook] parsed:',
+    JSON.stringify({
+      eventType: parsed.eventType,
+      ref: parsed.transactionRef,
+      amountKobo: parsed.amountKobo,
+      ci: parsed.customerIdentifier,
+      va: parsed.virtualAccountNumber,
+      topKeys: typeof payload === 'object' && payload !== null
+        ? Object.keys(payload as object).slice(0, 20)
+        : [],
+    }),
+  )
+
   // Only act on successful payments. Failed/other events are acknowledged
   // (200) so Squad stops retrying, but we don't write anything.
   if (parsed.eventType !== 'payment.success') {
