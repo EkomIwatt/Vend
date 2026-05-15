@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { paymentProvider } from '@/lib/payments'
 import { categorizeTransaction } from '@/lib/ai/gemini'
+import { generateVerificationCode, buildVerifyUrl } from '@/lib/receipts'
+import { sendReceiptEmail } from '@/lib/email/resend'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -103,11 +105,13 @@ export async function POST(request: Request) {
   // back to virtual_account_number. The fallback matters for VAs created
   // before the seller existed in our DB (e.g. sandbox testing scripts) and
   // for any case where Squad's customer_identifier echoback doesn't match.
-  let seller: { id: string; business_description: string } | null = null
+  let seller:
+    | { id: string; business_name: string; business_description: string }
+    | null = null
   if (parsed.customerIdentifier) {
     const { data } = await admin
       .from('sellers')
-      .select('id, business_description')
+      .select('id, business_name, business_description')
       .eq('squad_customer_identifier', parsed.customerIdentifier)
       .maybeSingle()
     seller = data
@@ -115,7 +119,7 @@ export async function POST(request: Request) {
   if (!seller && parsed.virtualAccountNumber) {
     const { data } = await admin
       .from('sellers')
-      .select('id, business_description')
+      .select('id, business_name, business_description')
       .eq('squad_virtual_account_number', parsed.virtualAccountNumber)
       .maybeSingle()
     seller = data
@@ -218,6 +222,53 @@ export async function POST(request: Request) {
     }
   } catch (err) {
     console.warn('[webhook] categorization failed (non-fatal):', err)
+  }
+
+  // 10. Receipt: always create the row (so /verify/[code] works), then
+  // try to email it if we have a payer address. Both steps are wrapped —
+  // a Resend outage or a missing email must not break the webhook ack.
+  try {
+    const code = generateVerificationCode()
+    const { data: receipt, error: receiptError } = await admin
+      .from('receipts')
+      .insert({
+        transaction_id: inserted.id,
+        verification_code: code,
+      })
+      .select('id, verification_code')
+      .single()
+
+    if (receiptError || !receipt) {
+      console.warn('[webhook] receipt insert failed (non-fatal):', receiptError)
+    } else if (payerEmail) {
+      const verifyUrl = buildVerifyUrl(receipt.verification_code)
+      const sendResult = await sendReceiptEmail({
+        to: payerEmail,
+        sellerBusinessName: seller.business_name,
+        amountKobo: parsed.amountKobo,
+        verifyUrl,
+        verificationCode: receipt.verification_code,
+        transactionRef: parsed.transactionRef,
+        paidAt: new Date(),
+        description,
+      })
+      if (sendResult.ok) {
+        await admin
+          .from('receipts')
+          .update({
+            delivered_to: payerEmail,
+            delivered_at: new Date().toISOString(),
+          })
+          .eq('id', receipt.id)
+        console.log('[webhook] receipt emailed:', receipt.verification_code, '→', payerEmail)
+      } else {
+        console.warn('[webhook] receipt email failed (non-fatal):', sendResult.error)
+      }
+    } else {
+      console.log('[webhook] receipt created without email (no payer_email):', receipt.verification_code)
+    }
+  } catch (err) {
+    console.warn('[webhook] receipt step threw (non-fatal):', err)
   }
 
   return NextResponse.json({ ok: true, transactionId: inserted.id })
