@@ -15,7 +15,7 @@ Phase-by-phase reference for the May 14-16 sprint. Paired with `vend_hackathon_s
 | Pre — Phase 1 + 2A | Squad sandbox + Next.js scaffold + Supabase + signup → VA → dashboard skeleton | ✅ Done (May 8–12) |
 | 1 | Payment surface (`/pay/[sellerId]`, dashboard share card, simulate-payment trigger) | ✅ Done (May 15) |
 | 2 | Webhook handler + Vercel deploy + register webhook URL with Squad | ✅ Done (May 15) |
-| 3 | Dashboard transactions list + total inflow + Gemini categorize + Gemini weekly summary | 🟡 Mostly done, awaiting summary-tone verification |
+| 3 | Dashboard transactions list + total inflow + Gemini categorize + Gemini weekly summary + cache | ✅ Done (May 15) |
 | 4 | Receipt generation + Resend email + public `/verify/[code]` page | ⏳ Pending |
 | 5 | Polish (trust score badge, visual consistency, README, final smoke test) | ⏳ Pending |
 | 6 | Pitch deck (10 slides per spec §11), one-pager PDF, demo rehearsal ×3 | ⏳ Pending |
@@ -159,7 +159,7 @@ Hit "Merchant has reached account opening limit, please contact habaripay suppor
 
 ---
 
-## Phase 3 — Dashboard transactions + Gemini AI 🟡 (mostly done 2026-05-15, awaiting summary-tone verification)
+## Phase 3 — Dashboard transactions + Gemini AI ✅ (completed 2026-05-15)
 
 **Provider note:** Switched from Claude to Gemini early in the phase — Anthropic now requires credit-card setup even for free trial credits, while Google AI Studio gives a free key with no payment friction. Spec/pitch slides should reference "Google AI / Gemini" or just "AI".
 
@@ -184,17 +184,38 @@ Hit "Merchant has reached account opening limit, please contact habaripay suppor
 - `GEMINI_API_KEY` added to Vercel ✓ (user confirmed)
 - Not in local `.env.local` yet (only Vercel) — fine for now, dev work can stub or skip
 
-### Open items
+### Summary caching (final wrap)
 
-- **Summary tone verification** — user wants warm/encouraging/specific, like "Hi Tomi, your business is doing really great…". Prompt rewritten (commit `3ce49d2`). Vercel redeploy was in flight when session ended. **First action on resume:** ask user to paste the new summary text the dashboard now renders, iterate on the prompt if needed.
-- **Description text noise** (deferred to Phase 5 per user) — Squad's auto-remarks `"Transfer from <legal_name> to sandbox | [<customer_identifier>]"` are stored in `transactions.description` and shown on the dashboard row. When the buyer didn't type into the optional /pay form description field, this verbose text leaks through. Fix: webhook handler should store `description = pending?.payer_description ?? null` instead of falling back to Squad's remarks.
+Free-tier Gemini hits 10 RPM and rapid reloads (judge demo, dev iteration) blanked the banner with HTTP 429. Added `seller_summaries` table — one row per seller, fingerprinted by `count:totalKobo:lastTxnIso` of the week's transactions. Cache returns instantly; Gemini only called when state changes. Stale-cache fallback if a fresh call fails. Migration in `supabase/03_seller_summaries.sql`.
+
+### Model swap
+
+Started on `gemini-2.5-flash`, then `gemini-2.0-flash` — both returned `"limit: 0"` from this account's free tier (regional restriction Google applies to newer models for certain accounts/locations). `gemini-2.5-flash-lite` works with this key and has the highest free-tier daily cap (~1000/day). Locked in.
+
+### Prompt — final form
+
+Three reloads were producing the same shape: "Hi Tomi, a steady…" / "Hi Tomi, a solid ₦…" / "Hi Tomi, a good start…". Model was latching onto the example openers. Fix:
+- Added explicit anti-pattern with the three observed bad openers spelled out
+- Replaced examples with structurally varied ones (name doesn't always lead, openers differ)
+- Banned hedge words (`steady`, `solid`, `good`, `great`, `nice`) as openers
+- Temperature 0.55 → 0.85 for reload-to-reload variety
+
+Verified prod output (https://vend-plum.vercel.app/dashboard):
+> Tomi, ₦8,000 came in from two braiding appointments this Friday, and it's great to see those personal care bookings landing! Focusing on filling those Friday slots will build a strong rhythm for you.
+
+Name lands naturally, specific (amount + day + category), forward-looking close. Tone locked.
+
+### Deferred items (Phase 5)
+
+- **Description text noise** — Squad's auto-remarks `"Transfer from <legal_name> to sandbox | [<customer_identifier>]"` are stored in `transactions.description` and shown on the dashboard row when buyer didn't type into the /pay form description field. Fix: webhook should store `description = pending?.payer_description ?? null` instead of falling back to Squad's remarks.
 - **Two existing transactions** (`770d658d…`, `c7db8c66…`) were backfilled with `ai_category = personal_care` directly via Supabase admin API since they came in before Gemini was wired. Future transactions go through Gemini naturally.
 
 ### Commits in Phase 3 order
 
 - `ca7e21e` — Phase 3 baseline: dashboard rewrite + gemini.ts + webhook categorize call
 - `7363ce0` — Tighter summary prompt + output sanitizer (still too plain for the user's taste)
-- `3ce49d2` — Warm 2-3 sentence summary with first-name greeting (current head)
+- `3ce49d2` — Warm 2-3 sentence summary with first-name greeting
+- `96192d5` — Cache + model swap to `gemini-2.5-flash-lite` + anti-pattern prompt rewrite (current head)
 
 ---
 
