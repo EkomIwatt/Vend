@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import QRCode from 'qrcode'
 import { createClient } from '@/lib/supabase-server'
 import { formatAccountNumber, bankNameFromCode, formatNaira } from '@/lib/format'
@@ -25,8 +24,8 @@ export default async function DashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
+  // Layout has already enforced auth; this assertion is just for TypeScript.
+  if (!user) return null
 
   const { data: seller } = await supabase
     .from('sellers')
@@ -34,18 +33,8 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
     .maybeSingle()
 
-  if (!seller) {
-    return (
-      <main className="min-h-screen p-8">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-semibold">Account setup incomplete</h1>
-          <p className="text-ink-muted mt-2">
-            We couldn&apos;t find your seller profile. Please complete signup.
-          </p>
-        </div>
-      </main>
-    )
-  }
+  // Layout redirects if no seller row; this is defensive.
+  if (!seller) return null
 
   // Fetch last 30 days of successful transactions
   const since = new Date()
@@ -95,8 +84,8 @@ export default async function DashboardPage() {
   })
 
   return (
-    <main className="min-h-screen p-6 sm:p-10">
-      <div className="max-w-3xl mx-auto space-y-8">
+    <>
+      <div className="max-w-3xl space-y-8">
         <header className="flex items-baseline justify-between gap-4">
           <div>
             <p className="text-sm text-ink-muted">Vend</p>
@@ -216,7 +205,7 @@ export default async function DashboardPage() {
           Vend is in sandbox mode. No real money will be sent or received.
         </p>
       </div>
-    </main>
+    </>
   )
 }
 
