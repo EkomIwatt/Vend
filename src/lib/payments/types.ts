@@ -37,7 +37,8 @@ export type ParsedWebhook = {
   payerName?: string
   payerEmail?: string
   description?: string
-  customerIdentifier: string  // resolves back to our seller
+  customerIdentifier: string       // resolves back to our seller (primary key)
+  virtualAccountNumber: string     // fallback lookup if customer_identifier doesn't match
 }
 
 export interface PaymentProvider {

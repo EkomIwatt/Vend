@@ -173,6 +173,7 @@ export class SquadProvider implements PaymentProvider {
       payerEmail: data.payer_email ?? undefined,
       description: data.remarks ?? data.description ?? undefined,
       customerIdentifier: String(data.customer_identifier ?? ''),
+      virtualAccountNumber: String(data.virtual_account_number ?? ''),
     }
   }
 }

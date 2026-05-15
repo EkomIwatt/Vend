@@ -53,8 +53,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, ignored: true })
   }
 
-  if (!parsed.transactionRef || !parsed.customerIdentifier) {
-    console.warn('[webhook] missing ref or customer_identifier', parsed)
+  if (!parsed.transactionRef) {
+    console.warn('[webhook] missing transaction_reference', parsed)
+    return NextResponse.json({ ok: true, ignored: true })
+  }
+  if (!parsed.customerIdentifier && !parsed.virtualAccountNumber) {
+    console.warn('[webhook] missing both customer_identifier and virtual_account_number', parsed)
     return NextResponse.json({ ok: true, ignored: true })
   }
 
@@ -72,17 +76,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, duplicate: true })
   }
 
-  // 5. Resolve seller
-  const { data: seller, error: sellerError } = await admin
-    .from('sellers')
-    .select('id')
-    .eq('squad_customer_identifier', parsed.customerIdentifier)
-    .maybeSingle()
+  // 5. Resolve seller — try customer_identifier first (primary), then fall
+  // back to virtual_account_number. The fallback matters for VAs created
+  // before the seller existed in our DB (e.g. sandbox testing scripts) and
+  // for any case where Squad's customer_identifier echoback doesn't match.
+  let seller: { id: string } | null = null
+  if (parsed.customerIdentifier) {
+    const { data } = await admin
+      .from('sellers')
+      .select('id')
+      .eq('squad_customer_identifier', parsed.customerIdentifier)
+      .maybeSingle()
+    seller = data
+  }
+  if (!seller && parsed.virtualAccountNumber) {
+    const { data } = await admin
+      .from('sellers')
+      .select('id')
+      .eq('squad_virtual_account_number', parsed.virtualAccountNumber)
+      .maybeSingle()
+    seller = data
+    if (seller) {
+      console.log(
+        '[webhook] resolved seller via virtual_account_number fallback:',
+        parsed.virtualAccountNumber,
+      )
+    }
+  }
 
-  if (sellerError || !seller) {
-    // Webhook arrived for a customer_identifier we don't recognize. Possibly
-    // an orphan virtual account from a rolled-back signup. Ack to stop retries.
-    console.warn('[webhook] unknown customer_identifier:', parsed.customerIdentifier)
+  if (!seller) {
+    // Webhook arrived for a VA + customer_identifier combo we don't recognize.
+    // Possibly an orphan virtual account from a rolled-back signup. Ack to
+    // stop retries.
+    console.warn(
+      '[webhook] unknown seller:',
+      'ci=' + parsed.customerIdentifier,
+      'va=' + parsed.virtualAccountNumber,
+    )
     return NextResponse.json({ ok: true, ignored: true })
   }
 
