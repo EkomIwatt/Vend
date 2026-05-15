@@ -40,6 +40,7 @@ export async function sendReceiptEmail(input: SendReceiptInput): Promise<SendRes
   const paidAtStr = input.paidAt.toLocaleString('en-NG', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: 'Africa/Lagos',
   })
 
   const subject = `Receipt for ${amount} to ${input.sellerBusinessName}`

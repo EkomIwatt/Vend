@@ -58,6 +58,7 @@ export default async function VerifyPage({ params }: Props) {
   const paidAtStr = paidAt.toLocaleString('en-NG', {
     dateStyle: 'long',
     timeStyle: 'short',
+    timeZone: 'Africa/Lagos',
   })
 
   return (
