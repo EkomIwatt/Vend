@@ -57,13 +57,6 @@ export default function Sidebar({ seller }: { seller: SellerSummary }) {
     >
       {collapsed ? (
         <div className="border-b border-white/10 px-3 py-5 flex flex-col items-center gap-3">
-          <Link
-            href="/dashboard"
-            className="font-serif text-2xl text-white tracking-tight"
-            title="Vend"
-          >
-            V
-          </Link>
           <button
             onClick={toggle}
             title="Expand sidebar"
@@ -72,6 +65,13 @@ export default function Sidebar({ seller }: { seller: SellerSummary }) {
           >
             <IconChevron className="w-4 h-4" />
           </button>
+          <Link
+            href="/dashboard"
+            className="font-serif text-2xl text-white tracking-tight"
+            title="Vend"
+          >
+            V
+          </Link>
         </div>
       ) : (
         <div className="border-b border-white/10 px-6 py-5 flex items-start justify-between gap-2">
