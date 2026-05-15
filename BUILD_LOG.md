@@ -17,7 +17,7 @@ Phase-by-phase reference for the May 14-16 sprint. Paired with `vend_hackathon_s
 | 2 | Webhook handler + Vercel deploy + register webhook URL with Squad | ✅ Done (May 15) |
 | 3 | Dashboard transactions list + total inflow + Gemini categorize + Gemini weekly summary + cache | ✅ Done (May 15) |
 | 4 | Receipt generation + Resend email + public `/verify/[code]` page | ✅ Done (May 15) |
-| 5 | Polish (trust score badge, visual consistency, README, final smoke test) | ⏳ Pending |
+| 5 | Polish (trust score badge, visual consistency, README, final smoke test) | ✅ Done (May 15) |
 | 6 | Pitch deck (10 slides per spec §11), one-pager PDF, demo rehearsal ×3 | ⏳ Pending |
 
 ---
@@ -278,9 +278,67 @@ Fix: pass `timeZone: 'Africa/Lagos'` explicitly in both the verify page render a
 
 ---
 
-## Phase 5 — Polish + final deploy ⏳
+## Phase 5 — Polish + final deploy ✅ (completed 2026-05-15)
 
-To be filled in.
+**Goal:** Tighten the demo surface before judges see it — trust score badge wired up, description-noise PII leak closed, README usable as a reproducer, full seven-step loop run end-to-end on prod.
+
+### Modified files
+
+| Path | Change |
+|---|---|
+| `src/app/api/webhooks/squad/route.ts` | Dropped the `parsed.description` fallback when no `pending_payments` row matched. Squad's webhook `remarks` field is auto-generated (`"Transfer from <legal_name> to sandbox \| [<customer_identifier>]"`) and was leaking the seller's BVN-matched legal name onto the dashboard and into receipts. New behaviour: `description` is only set when the buyer typed one on `/pay`. |
+| `src/app/dashboard/page.tsx` | Added a `TRUST X.X` badge to the header alongside the tier badge. Reads from `sellers.trust_score`. Tooltip explains the signal mix per spec §12 (payment regularity, time on Vend, customer reviews). |
+| `src/app/pay/[sellerId]/page.tsx` | Replaced the bare `Trust score · 0` line with the same styled badge — `TRUST 8.4/10` with the `/10` greyed out and explanation tooltip. Makes the buyer-facing trust signal feel intentional instead of broken. |
+| `README.md` | Full rewrite. Was still labeled "Phase 2A" and out of date. New version: project description, live demo URL, stack, architecture sketch, account prerequisites (Supabase + Squad + Resend + Gemini), env-var table, migration order, webhook setup steps, judge-facing notes, and a known-gaps section. Aimed at "a judge can reproduce from a fresh clone." |
+
+### Design decisions
+
+**Trust score = 8.4/10, static, with a tooltip.** Spec §4 calls this "static number on dashboard, explanation on slide." Picked 8.4 because it's high enough to read as "this seller has built credibility" without claiming perfection, and decimal precision suggests an underlying calculation. The tooltip carries the spec §12 narrative — "payment regularity, time on platform, customer reviews" — so a judge who hovers gets the post-MVP signal mix without us having to build the pipeline today. Stored as `numeric` so a future real implementation can write any value.
+
+**Why drop the Squad description fallback entirely.** Squad's `remarks` field on the webhook is auto-generated server-side and always contains the seller's legal name (BVN-matched) plus the internal `customer_identifier`. There is no production scenario where we want that text shown to a buyer or stored on a transaction. Buyer-typed descriptions arrive via the `pending_payments` bridge from `/pay`; real bank transfers in production carry sender info in dedicated fields (`sender_name`, etc.), not in `remarks`. Dropping the fallback removes the PII leak and aligns the demo with how real bank inflows will look.
+
+### Operational SQL (one-shot, in Supabase SQL Editor)
+
+```sql
+-- 1. Set the seed seller's trust score
+update sellers
+set trust_score = 8.4
+where id = '6882d4a2-846b-40e2-9e56-f805fe0eb23a';
+
+-- 2. Backfill description noise on existing transactions
+update transactions
+set description = null
+where description like 'Transfer from %';
+```
+
+Both ran cleanly. Two pre-existing transactions had their `description` cleared; nothing buyer-typed matches the `Transfer from %` pattern.
+
+### Visual consistency pass
+
+Quick scan of every demo-touching page. All consistent with spec §10 tokens — primary `#0F4C3A`, surface `#FAF7F2`, Inter UI, serif business name on receipt + verify + dashboard headers, tabular figures (`tnum`) on all amounts. No nits worth fixing in remaining time.
+
+### Final smoke test (passed 2026-05-15)
+
+Full seven-step loop on prod, end-to-end:
+
+1. Open `/dashboard` — trust 8.4 badge visible, existing rows clean (no "Transfer from..." noise)
+2. Open `/pay/[sellerId]` in incognito — buyer view shows `TRUST 8.4/10`
+3. Submit payment ₦X with payer email `ekomzwatt@gmail.com`, free-form description
+4. Dashboard refreshes within seconds, new row appears with the typed description (not auto-remarks) and Gemini category badge
+5. Receipt email arrived in Gmail (delivery took longer than the first Phase 4 test — Resend free tier sometimes queues; worth flagging during the live demo with a verbal bridge rather than refreshing Gmail silently)
+6. WAT timestamp on email correct
+7. Verify link opens `/verify/[code]` cleanly
+
+### Deferred to Phase 6 / post-hackathon
+
+- **Bias/fairness slide bullet** — spec §15 open question. Belongs in the pitch deck, not in code.
+- **Logo upload + accent picker for receipts** — spec §4 highest-value stretch, skipped to preserve buffer for Phase 6 deck + rehearsal.
+- **Custom Resend domain** (e.g. `receipts@vend.<tld>`) — post-hackathon, one env-var swap on Vercel.
+- **Resend deliverability latency** — observed during smoke test that some emails take noticeably longer than others on the free tier. Not in our control. Mitigation: verbal bridge during live demo ("...and a receipt is on its way to the buyer's inbox").
+
+### Commits in Phase 5 order
+
+- `de3b3bb` — Phase 5 polish: trust badge, description cleanup, README rewrite
 
 ---
 
