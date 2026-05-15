@@ -139,19 +139,39 @@ export async function summarizeWeek(input: {
     })
     .join('\n')
 
-  const prompt = `Write ONE conversational sentence summarizing this week's earnings for a Nigerian micro-merchant. Use ₦ for naira. Sound like a friend. Max 25 words. No preamble, no quotes, no "Here is".
+  const prompt = `Write ONE short sentence (12-22 words) recapping a Nigerian micro-merchant's week. Plain, factual, friendly. Address the seller as "you". Use ₦ with commas (e.g. ₦47,000). No preamble. No quotes. No emojis. No "this week" filler — just state what happened.
+
+If only 1 transaction: lead with the single amount and what they earned it on (category).
+If 2+ transactions: lead with total + count, then mention the busiest day OR the dominant category.
+If total < ₦1,000: keep it gentle — small numbers don't need celebration words.
+
+Examples of good output (length, tone):
+  - You earned ₦47,000 from 12 payments, with Saturday being your busiest day.
+  - One payment of ₦5,000 landed today — looks like a hair-braiding job.
+  - ₦12,500 across 3 payments, most of them on Friday.
 
 Business: ${input.businessName}
-Total this week: ₦${totalNaira} across ${count} payment${count === 1 ? '' : 's'}
-Busiest day: ${busiestDay ?? 'n/a'}
-Transactions:
+Total: ₦${totalNaira}
+Count: ${count}
+Busiest day: ${busiestDay ?? 'n/a'} (${busiestCount} payment${busiestCount === 1 ? '' : 's'})
+Recent transactions:
 ${sample}
 
-Sentence:`
+Output exactly one sentence and nothing else:`
 
-  const raw = await callGemini(prompt, { maxOutputTokens: 80, temperature: 0.6 })
+  const raw = await callGemini(prompt, { maxOutputTokens: 60, temperature: 0.3 })
   if (!raw) return null
 
-  // Strip surrounding quotes if the model added them
-  return raw.replace(/^["'`]|["'`]$/g, '').trim()
+  // Strip surrounding quotes/code-fences and any leading "Output:" or "Here is" preamble
+  let cleaned = raw
+    .replace(/^["'`*\s]+|["'`*\s]+$/g, '')
+    .replace(/^(Output|Sentence|Summary|Here(?:'s|\sis))\s*:?\s*/i, '')
+    .trim()
+
+  // Take only first sentence if the model emitted multiple
+  const firstSentenceEnd = cleaned.search(/[.!?](\s|$)/)
+  if (firstSentenceEnd !== -1) {
+    cleaned = cleaned.slice(0, firstSentenceEnd + 1)
+  }
+  return cleaned
 }
