@@ -14,7 +14,7 @@ Phase-by-phase reference for the May 14-16 sprint. Paired with `vend_hackathon_s
 |---|---|---|
 | Pre — Phase 1 + 2A | Squad sandbox + Next.js scaffold + Supabase + signup → VA → dashboard skeleton | ✅ Done (May 8–12) |
 | 1 | Payment surface (`/pay/[sellerId]`, dashboard share card, simulate-payment trigger) | ✅ Done (May 15) |
-| 2 | Webhook handler + Vercel deploy + register webhook URL with Squad | ⏳ Next |
+| 2 | Webhook handler + Vercel deploy + register webhook URL with Squad | ✅ Done (May 15) |
 | 3 | Dashboard transactions list + total inflow + Claude categorize + Claude weekly summary | ⏳ Pending |
 | 4 | Receipt generation + Resend email + public `/verify/[code]` page | ⏳ Pending |
 | 5 | Polish (trust score badge, visual consistency, README, final smoke test) | ⏳ Pending |
@@ -102,7 +102,7 @@ User to verify manually: dashboard share card renders with QR, `/pay/[sellerId]`
 
 ---
 
-## Phase 2 — Webhook handler + Vercel deploy ⏳ (in progress 2026-05-15)
+## Phase 2 — Webhook handler + Vercel deploy ✅ (completed 2026-05-15)
 
 **Goal:** Steps 4–5 of the demo loop. Inbound payment → transaction row in DB within seconds.
 
@@ -115,10 +115,10 @@ User to verify manually: dashboard share card renders with QR, `/pay/[sellerId]`
 - [x] Unrecognized `customer_identifier` is acked with 200 (orphan VAs from rolled-back signups don't cause Squad to retry forever)
 - [x] `git init` in `vend-app/` (single project, not the workspace root)
 - [x] `.gitignore` extended to ignore `.vercel/`
-- [ ] Create GitHub repo + push
-- [ ] Vercel: import repo, configure env vars, first deploy
-- [ ] Register webhook URL in Squad sandbox dashboard
-- [ ] Smoke test deployed: `/pay/<id>` submit → transaction lands in Supabase within ~5 sec
+- [x] GitHub repo `EkomIwatt/Vend` created, initial commit pushed
+- [x] Vercel project deployed: https://vend-plum.vercel.app (production)
+- [x] Webhook URL registered in Squad sandbox: `https://vend-plum.vercel.app/api/webhooks/squad`
+- [x] Smoke test PASSED — signature verifies, seller resolves via VA fallback, transaction lands with payer info merged from pending_payments
 
 ### Files
 
@@ -133,6 +133,29 @@ User to verify manually: dashboard share card renders with QR, `/pay/[sellerId]`
 **Why we always 200 on signed-but-unprocessable payloads:** Squad retries non-2xx responses. For events we can't handle (unknown customer_identifier, failed payment events, malformed bodies after signature passed), retrying won't fix anything. Returning 200 stops the retry storm.
 
 **Header naming:** Squad's docs disagree across pages on whether the signature header is `x-squad-encrypted-body` or `x-squad-signature`. The route accepts either. Once we observe a real webhook in production, we can narrow this.
+
+### Live-fire fixes (real Squad sandbox webhook, May 15)
+
+When the first end-to-end test fired, three issues surfaced that the spec hadn't predicted:
+
+1. **Signature algorithm.** Spec's "6 piped fields" formula was wrong. Real algorithm per Squad's docs is `HMAC-SHA512(JSON.stringify(<parsed body>))` with **uppercase** hex output. Fixed in commit `ee7aa04`.
+
+2. **Event field is often absent.** Squad's virtual-account inbound webhooks frequently have no `Event` / `transaction_status` field — they're sent only when a payment lands, so absence of a failure marker means success. `parseWebhook` now infers success from "transaction_reference + non-zero amount + no failure signal". Fixed in commit `73f0cf4`.
+
+3. **customer_identifier mismatch.** The existing VA `6676146167` was created from the May 8 sandbox script with identifier `vend_test_1778245081234`, but the demo seller fixture used `vend_demo_seed_va6676146167`. Lookup by `customer_identifier` returned no seller. Fallback lookup by `virtual_account_number` saved us. Worth keeping in production — it's a more robust resolver. Fixed in commit `7db7e2d`.
+
+**Observed Squad webhook body (top-level keys for VA inbound):**
+```
+transaction_reference, virtual_account_number, principal_amount, settled_amount,
+fee_charged, transaction_date, customer_identifier, transaction_indicator,
+remarks, currency, channel, sender_name, meta, encrypted_body
+```
+
+No `Event` or `transaction_status`. `remarks` carries Squad's auto-generated description (`"Transfer from <legal_name> to sandbox | [<customer_identifier>]"`). `sender_name` is the payer's bank-side name. We currently read `payer_name` from the pending_payments match instead (the buyer typed it on the /pay form), which is more accurate for the demo.
+
+### Squad sandbox merchant rate limit
+
+Hit "Merchant has reached account opening limit, please contact habaripay support" mid-build. Existing VAs remain usable. Workaround applied: seeded one demo seller (`6882d4a2-846b-40e2-9e56-f805fe0eb23a` / Tomi's Braids) directly via Supabase admin API, pinning it to the May 8 VA. Support ping sent in parallel — if HabariPay lifts the cap before the demo, live signup flow becomes demoable again.
 
 ---
 
