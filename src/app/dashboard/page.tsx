@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import QRCode from 'qrcode'
 import { createClient } from '@/lib/supabase-server'
 import { formatAccountNumber, bankNameFromCode, formatNaira } from '@/lib/format'
-import { summarizeWeek } from '@/lib/ai/gemini'
+import { getOrCreateWeekSummary } from '@/lib/ai/summary-cache'
 import ShareCard from './ShareCard'
 
 export const dynamic = 'force-dynamic'
@@ -77,7 +77,8 @@ export default async function DashboardPage() {
       ? businessFirstWord
       : seller.legal_first_name
 
-  const summary = await summarizeWeek({
+  const summary = await getOrCreateWeekSummary({
+    sellerId: seller.id,
     businessName: seller.business_name,
     firstName: greetingName,
     transactions: weekTxns,
