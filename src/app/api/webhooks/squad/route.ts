@@ -32,8 +32,14 @@ export async function POST(request: Request) {
     request.headers.get('x-squad-signature') ??
     ''
 
-  if (!paymentProvider.verifyWebhook(rawBody, signature)) {
-    console.warn('[webhook] rejected: signature mismatch')
+  const sigValid = paymentProvider.verifyWebhook(rawBody, signature)
+  console.log(
+    '[webhook] signature check:',
+    sigValid ? 'PASS' : 'FAIL',
+    '· sig_prefix=' + (signature?.slice(0, 16) ?? 'none'),
+    '· body_bytes=' + rawBody.length,
+  )
+  if (!sigValid) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 

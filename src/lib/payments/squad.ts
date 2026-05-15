@@ -111,36 +111,43 @@ export class SquadProvider implements PaymentProvider {
   }
 
   /**
-   * Verify Squad's v3 webhook signature. Read the raw body (NOT parsed JSON)
-   * and the `x-squad-encrypted-body` header (Squad's v3 signature header name —
-   * older docs say `x-squad-signature`, but v3 uses the new header).
+   * Verify Squad's webhook signature.
+   *
+   * Algorithm (from Squad's official docs, confirmed 2026-05-15):
+   *   - Header: `x-squad-encrypted-body`
+   *   - Hash input: `JSON.stringify(<parsed body>)` — the entire body re-serialized
+   *   - HMAC-SHA512, key = merchant secret key
+   *   - Output: uppercase hex
+   *
+   * Note the earlier internal spec claimed a 6-piped-fields hash input. That
+   * was wrong — the real algorithm hashes the full normalized JSON body.
    */
   verifyWebhook(rawBody: string, signature: string): boolean {
     if (!signature) return false
-    let parsed: any
+    let parsed: unknown
     try {
       parsed = JSON.parse(rawBody)
     } catch {
       return false
     }
 
-    const t = parsed?.transaction_reference ?? parsed?.data?.transaction_reference ?? ''
-    const v = parsed?.virtual_account_number ?? parsed?.data?.virtual_account_number ?? ''
-    const c = parsed?.currency ?? parsed?.data?.currency ?? 'NGN'
-    const p = parsed?.principal_amount ?? parsed?.data?.principal_amount ?? ''
-    const s = parsed?.settled_amount ?? parsed?.data?.settled_amount ?? ''
-    const ci = parsed?.customer_identifier ?? parsed?.data?.customer_identifier ?? ''
-
-    const hashInput = `${t}|${v}|${c}|${p}|${s}|${ci}`
+    const normalized = JSON.stringify(parsed)
     const expected = crypto
       .createHmac('sha512', this.secretKey)
-      .update(hashInput)
+      .update(normalized)
       .digest('hex')
+      .toUpperCase()
 
-    // Constant-time comparison
-    const a = Buffer.from(expected, 'hex')
-    const b = Buffer.from(signature, 'hex')
-    if (a.length !== b.length) return false
+    // Buffer.from accepts upper or lower hex equivalently. Constant-time compare.
+    let a: Buffer
+    let b: Buffer
+    try {
+      a = Buffer.from(expected, 'hex')
+      b = Buffer.from(signature, 'hex')
+    } catch {
+      return false
+    }
+    if (a.length !== b.length || a.length === 0) return false
     return crypto.timingSafeEqual(a, b)
   }
 
