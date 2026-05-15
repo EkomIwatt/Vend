@@ -97,6 +97,7 @@ Category:`
 
 export async function summarizeWeek(input: {
   businessName: string
+  firstName?: string
   transactions: Array<{
     amount_kobo: number
     description: string | null
@@ -139,39 +140,42 @@ export async function summarizeWeek(input: {
     })
     .join('\n')
 
-  const prompt = `Write ONE short sentence (12-22 words) recapping a Nigerian micro-merchant's week. Plain, factual, friendly. Address the seller as "you". Use ₦ with commas (e.g. ₦47,000). No preamble. No quotes. No emojis. No "this week" filler — just state what happened.
+  const greetingName = (input.firstName?.trim() || input.businessName).split(/\s|'/)[0]
 
-If only 1 transaction: lead with the single amount and what they earned it on (category).
-If 2+ transactions: lead with total + count, then mention the busiest day OR the dominant category.
-If total < ₦1,000: keep it gentle — small numbers don't need celebration words.
+  const prompt = `Write a warm, encouraging 2–3 sentence weekly recap for a Nigerian campus micro-merchant. Tone: like a supportive friend or coach who's noticed their hustle. Lively but not cheesy. Specific, not generic.
 
-Examples of good output (length, tone):
-  - You earned ₦47,000 from 12 payments, with Saturday being your busiest day.
-  - One payment of ₦5,000 landed today — looks like a hair-braiding job.
-  - ₦12,500 across 3 payments, most of them on Friday.
+RULES:
+- Open with "Hi ${greetingName}," or "Hey ${greetingName},"
+- Mention the actual total (with ₦ and commas, e.g. ₦47,000) and the number of payments
+- Reference at least ONE concrete detail from the data: the busiest day, the dominant category, or the size of a standout payment
+- End with a forward-looking line — encouragement, observation, or a light next step. Not pushy.
+- 35–70 words total, 2–3 sentences
+- No emojis. No exclamation marks beyond one. No "amazing/awesome/incredible" word salad — earn the energy with specifics.
+- If total is small (₦5,000 or less) or count is 1: stay gentle and grounded, frame it as a beginning not a celebration.
 
+GOOD EXAMPLES (match this register):
+- Hi Tomi, your braids business is buzzing — ₦47,000 across 12 bookings this week, with Saturday alone bringing 4 clients. Weekend energy is clearly your sweet spot. Keep showing up.
+- Hey Adaeze, a steady ₦12,500 from 3 food orders, mostly mid-week. Small but consistent — and your repeat customers are starting to show. The next jump usually comes from one good referral.
+- Hi Tomi, one booking of ₦5,000 came in today, your first on Vend. Every payment after this one builds the trust score that unlocks higher limits. Share your link in a hostel group when you can.
+
+DATA:
 Business: ${input.businessName}
-Total: ₦${totalNaira}
-Count: ${count}
+Owner name to use: ${greetingName}
+Total this week: ₦${totalNaira}
+Number of payments: ${count}
 Busiest day: ${busiestDay ?? 'n/a'} (${busiestCount} payment${busiestCount === 1 ? '' : 's'})
 Recent transactions:
 ${sample}
 
-Output exactly one sentence and nothing else:`
+Write the recap now (no preamble, no quotes, just the recap text):`
 
-  const raw = await callGemini(prompt, { maxOutputTokens: 60, temperature: 0.3 })
+  const raw = await callGemini(prompt, { maxOutputTokens: 200, temperature: 0.55 })
   if (!raw) return null
 
   // Strip surrounding quotes/code-fences and any leading "Output:" or "Here is" preamble
-  let cleaned = raw
+  const cleaned = raw
     .replace(/^["'`*\s]+|["'`*\s]+$/g, '')
-    .replace(/^(Output|Sentence|Summary|Here(?:'s|\sis))\s*:?\s*/i, '')
+    .replace(/^(Output|Recap|Sentence|Summary|Here(?:'s|\sis))\s*:?\s*/i, '')
     .trim()
-
-  // Take only first sentence if the model emitted multiple
-  const firstSentenceEnd = cleaned.search(/[.!?](\s|$)/)
-  if (firstSentenceEnd !== -1) {
-    cleaned = cleaned.slice(0, firstSentenceEnd + 1)
-  }
   return cleaned
 }

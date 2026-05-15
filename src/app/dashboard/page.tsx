@@ -68,8 +68,18 @@ export default async function DashboardPage() {
   const weekTxns = txns.filter((t) => new Date(t.created_at) >= weekAgo)
   const totalKobo7d = weekTxns.reduce((acc, t) => acc + Number(t.amount_kobo), 0)
 
+  // First name for the AI greeting. Prefer the business-name prefix ("Tomi's
+  // Braids" → "Tomi") since that's how the seller actually identifies; fall
+  // back to legal_first_name.
+  const businessFirstWord = String(seller.business_name).split(/\s|'/)[0]
+  const greetingName =
+    businessFirstWord && businessFirstWord.length > 1
+      ? businessFirstWord
+      : seller.legal_first_name
+
   const summary = await summarizeWeek({
     businessName: seller.business_name,
+    firstName: greetingName,
     transactions: weekTxns,
   })
 
