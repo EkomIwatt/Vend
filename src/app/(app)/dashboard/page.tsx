@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase-server'
 import { formatAccountNumber, bankNameFromCode, formatNaira } from '@/lib/format'
 import { getOrCreateWeekSummary } from '@/lib/ai/summary-cache'
 import ShareCard from './ShareCard'
+import WeeklyChart from './WeeklyChart'
+import TopCategories from './TopCategories'
+import TrustBreakdown from './TrustBreakdown'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,6 +76,14 @@ export default async function DashboardPage() {
     transactions: weekTxns,
   })
 
+  // Trust signal inputs
+  const daysOnPlatform = Math.max(
+    0,
+    Math.floor(
+      (Date.now() - new Date(seller.created_at).getTime()) / 86_400_000,
+    ),
+  )
+
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL ??
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
@@ -85,7 +96,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <div className="max-w-3xl space-y-8">
+      <div className="max-w-4xl space-y-8">
         <header className="flex items-baseline justify-between gap-4">
           <div>
             <p className="text-sm text-ink-muted">Vend</p>
@@ -137,6 +148,19 @@ export default async function DashboardPage() {
               {txns.length} payment{txns.length === 1 ? '' : 's'}
             </p>
           </div>
+        </div>
+
+        {/* 7-day chart */}
+        <WeeklyChart transactions={weekTxns} />
+
+        {/* Categories + Trust side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <TopCategories transactions={weekTxns} />
+          <TrustBreakdown
+            score={Number(seller.trust_score ?? 0)}
+            daysOnPlatform={daysOnPlatform}
+            transactionCount={txns.length}
+          />
         </div>
 
         <div className="bg-white border border-line rounded-lg p-6">
