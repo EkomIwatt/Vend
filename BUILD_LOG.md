@@ -16,7 +16,7 @@ Phase-by-phase reference for the May 14-16 sprint. Paired with `vend_hackathon_s
 | 1 | Payment surface (`/pay/[sellerId]`, dashboard share card, simulate-payment trigger) | ✅ Done (May 15) |
 | 2 | Webhook handler + Vercel deploy + register webhook URL with Squad | ✅ Done (May 15) |
 | 3 | Dashboard transactions list + total inflow + Gemini categorize + Gemini weekly summary + cache | ✅ Done (May 15) |
-| 4 | Receipt generation + Resend email + public `/verify/[code]` page | ⏳ Pending |
+| 4 | Receipt generation + Resend email + public `/verify/[code]` page | ✅ Done (May 15) |
 | 5 | Polish (trust score badge, visual consistency, README, final smoke test) | ⏳ Pending |
 | 6 | Pitch deck (10 slides per spec §11), one-pager PDF, demo rehearsal ×3 | ⏳ Pending |
 
@@ -219,9 +219,62 @@ Name lands naturally, specific (amount + day + category), forward-looking close.
 
 ---
 
-## Phase 4 — Receipt email + public verify page ⏳
+## Phase 4 — Receipt email + public verify page ✅ (completed 2026-05-15)
 
-To be filled in.
+**Goal:** Step 6 of the demo loop. Successful webhook → receipt row created → email sent to payer via Resend → public `/verify/[code]` page renders the receipt details.
+
+### New files
+
+| Path | Purpose |
+|---|---|
+| `src/lib/receipts.ts` | `generateVerificationCode()` + `buildVerifyUrl()`. 6-char nanoid with unambiguous alphabet (no `0/O/1/I/L`). |
+| `src/lib/email/resend.ts` | `sendReceiptEmail({ to, sellerBusinessName, amountKobo, verifyUrl, ... })`. HTML + text bodies. Never throws — returns `{ ok, error? }` so the webhook stays in control. |
+| `src/app/verify/[code]/page.tsx` | Public server component. Joins receipts → transactions → sellers via admin client. Renders amount, payer name (if known), description, paid-on date, reference, and the verification code. |
+| `src/app/verify/[code]/not-found.tsx` | 404 fallback for unknown codes. |
+
+### Modified files
+
+| Path | Change |
+|---|---|
+| `src/app/api/webhooks/squad/route.ts` | Added step 10: insert receipt row with a fresh code; if `payer_email` is present, call Resend and write `delivered_to`/`delivered_at` on success. Entire block try/caught — receipt failure must not break the 200 ack Squad needs. Seller select extended to include `business_name`. |
+
+### Design decisions
+
+**Verify page exposes nothing sensitive.** The page is unauthenticated and indexed by a six-char code, so it could in theory leak data to anyone who guesses one. Mitigations: short alphabet that's still 26⁶ ≈ 308M combinations (effectively unguessable at demo volume), and the select pulls **only** `business_name` and `business_description` from `sellers` — never BVN, legal name, phone, email, or address. The transaction side shows amount, optional payer name (no payer email), description, and the Squad ref. A judge can verify "yes, this payment happened" without learning who the buyer is or who the seller is beyond what the seller already exposed publicly.
+
+**Receipt creation is part of the webhook, not a separate worker.** Vercel functions are stateless and a separate post-webhook job would need a queue we don't have time to build. Keeping it inline means the receipt row exists before the webhook ack returns, which is fine — the row insert is cheap, and Resend is the slowest step (typically 300-800ms). Wrapping everything in try/catch means even if Resend is down, the transaction still lands and the dashboard still updates; only the email is missed.
+
+**Resend onboarding sender accepted as a compromise.** `RESEND_FROM_EMAIL=onboarding@resend.dev` is set on Vercel. Resend's onboarding sender only delivers to the email address registered on the Resend account (`ekomzwatt@gmail.com`), which is fine for the demo — we pay-to-self with that email. Upgrading to a real domain (`receipts@vend.<tld>`) is one env-var swap on Vercel, no code change. Tried `vend.ng` on Resend's add-domain page but didn't realize Resend's "add domain" doesn't actually register the domain — it just stages DNS verification for a domain you must own at a registrar (~₦10-15k/year via NiRA registrars). Deferred to post-hackathon.
+
+### Live-fire fix: timezone
+
+First end-to-end test caught a bug. Receipt page showed paid-at as `8:52` when the actual local time was `9:52` — off by exactly one hour. Root cause: Vercel runs in UTC by default, and `Date.toLocaleString('en-NG', {...})` formats in the **server's** timezone, not the user's locale's timezone. The `en-NG` locale controls number/date format conventions, not the timezone.
+
+Fix: pass `timeZone: 'Africa/Lagos'` explicitly in both the verify page render and the email body render. Committed in `f832661`. Captured in memory as `feedback-vercel-tz-lagos` so future timestamps in this project won't repeat the mistake.
+
+### Env state
+
+- `RESEND_API_KEY` and `RESEND_FROM_EMAIL=onboarding@resend.dev` added to Vercel (Production + Preview) and to local `.env.local`. User confirmed both end-to-end ✓
+- No new Supabase migration needed — `receipts` table was created back in `schema.sql` with public-read RLS, anticipating this phase.
+
+### Smoke test (passed 2026-05-15)
+
+- Paid ₦X via `/pay/[sellerId]` on prod, payer email = `ekomzwatt@gmail.com`
+- Receipt email arrived in Gmail within seconds
+- "Verify this receipt" link opened `/verify/[code]` cleanly
+- After timezone fix + hard refresh, paid-at displayed in WAT (9:52)
+
+### Deferred to Phase 5+
+
+- **Logo upload + accent color picker** for receipts (spec §4 highest-value Phase 4 stretch) — skipped to keep buffer for Phase 5 polish + Phase 6 pitch deck
+- **Custom sender domain** (`receipts@vend.ng` or similar) — needs a real domain registration, post-hackathon
+- **WhatsApp / SMS delivery** — out of scope per spec
+- **Receipt template variants** — one default template, no picker, per spec
+
+### Commits in Phase 4 order
+
+- `a5503e1` — Phase 4 baseline: receipts.ts + resend.ts + verify page + webhook hook
+- `f832661` — Pin timestamps to Africa/Lagos (UTC+1) on both verify page and email body
 
 ---
 
