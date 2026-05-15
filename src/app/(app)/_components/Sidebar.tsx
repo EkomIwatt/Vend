@@ -32,12 +32,12 @@ export default function Sidebar({ seller }: { seller: SellerSummary }) {
   }
 
   return (
-    <aside className="hidden lg:flex lg:flex-col w-60 shrink-0 border-r border-line bg-white">
-      <div className="px-6 py-5 border-b border-line">
-        <Link href="/dashboard" className="font-serif text-2xl text-primary tracking-tight">
+    <aside className="hidden lg:flex lg:flex-col w-60 shrink-0 bg-primary text-white">
+      <div className="px-6 py-5 border-b border-white/10">
+        <Link href="/dashboard" className="font-serif text-2xl text-white tracking-tight">
           Vend
         </Link>
-        <p className="text-xs text-ink-muted mt-0.5">Financial OS · Beta</p>
+        <p className="text-xs text-white/60 mt-0.5">Financial OS · Beta</p>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
@@ -67,20 +67,20 @@ export default function Sidebar({ seller }: { seller: SellerSummary }) {
         </Section>
       </nav>
 
-      <div className="px-4 py-4 border-t border-line">
-        <p className="text-xs text-ink-muted uppercase tracking-wide">Signed in as</p>
-        <p className="font-medium text-sm mt-0.5 truncate">{seller.business_name}</p>
+      <div className="px-4 py-4 border-t border-white/10">
+        <p className="text-xs text-white/50 uppercase tracking-wide">Signed in as</p>
+        <p className="font-medium text-sm mt-0.5 truncate text-white">{seller.business_name}</p>
         <div className="flex items-center gap-1.5 mt-1.5">
-          <span className="text-[10px] uppercase tracking-wide bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+          <span className="text-[10px] uppercase tracking-wide bg-white/10 text-white px-1.5 py-0.5 rounded font-medium">
             {seller.tier}
           </span>
-          <span className="text-[10px] uppercase tracking-wide bg-primary text-white px-1.5 py-0.5 rounded font-medium tnum">
+          <span className="text-[10px] uppercase tracking-wide bg-white text-primary px-1.5 py-0.5 rounded font-medium tnum">
             {Number(seller.trust_score ?? 0).toFixed(1)}
           </span>
         </div>
         <button
           onClick={signOut}
-          className="mt-3 text-xs text-ink-muted hover:text-ink"
+          className="mt-3 text-xs text-white/60 hover:text-white transition-colors"
         >
           Sign out
         </button>
@@ -93,7 +93,7 @@ function Section({ title, children }: { title?: string; children: React.ReactNod
   return (
     <div>
       {title && (
-        <p className="px-3 mb-1.5 text-[10px] uppercase tracking-widest text-ink-muted font-medium">
+        <p className="px-3 mb-1.5 text-[10px] uppercase tracking-widest text-white/40 font-medium">
           {title}
         </p>
       )}
@@ -122,14 +122,14 @@ function NavLink({
         className={[
           'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
           active
-            ? 'bg-primary/10 text-primary font-medium'
-            : 'text-ink-muted hover:bg-surface hover:text-ink',
+            ? 'bg-white text-primary font-medium'
+            : 'text-white/70 hover:bg-white/10 hover:text-white',
         ].join(' ')}
       >
         <Icon className="w-4 h-4 shrink-0" />
         <span className="flex-1 truncate">{label}</span>
         {badge && (
-          <span className="text-[9px] uppercase tracking-wider bg-line text-ink-muted px-1.5 py-0.5 rounded">
+          <span className="text-[9px] uppercase tracking-wider bg-white/15 text-white/70 px-1.5 py-0.5 rounded">
             {badge}
           </span>
         )}

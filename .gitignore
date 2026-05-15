@@ -8,3 +8,7 @@ out/
 .DS_Store
 .vercel/
 
+# Local-only design references (master context, hackathon guide, layout examples).
+# Not for the public repo.
+design/
+

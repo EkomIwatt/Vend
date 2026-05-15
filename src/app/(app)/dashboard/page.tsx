@@ -57,8 +57,23 @@ export default async function DashboardPage() {
   // Filter to last 7 days for the AI summary
   const weekAgo = new Date()
   weekAgo.setDate(weekAgo.getDate() - 7)
+  const twoWeeksAgo = new Date()
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
   const weekTxns = txns.filter((t) => new Date(t.created_at) >= weekAgo)
+  const prevWeekTxns = txns.filter((t) => {
+    const d = new Date(t.created_at)
+    return d >= twoWeeksAgo && d < weekAgo
+  })
   const totalKobo7d = weekTxns.reduce((acc, t) => acc + Number(t.amount_kobo), 0)
+  const totalKoboPrevWeek = prevWeekTxns.reduce(
+    (acc, t) => acc + Number(t.amount_kobo),
+    0,
+  )
+  const avgKobo7d = weekTxns.length > 0 ? Math.round(totalKobo7d / weekTxns.length) : 0
+  const deltaPct =
+    totalKoboPrevWeek > 0
+      ? Math.round(((totalKobo7d - totalKoboPrevWeek) / totalKoboPrevWeek) * 100)
+      : null
 
   // First name for the AI greeting. Prefer the business-name prefix ("Tomi's
   // Braids" → "Tomi") since that's how the seller actually identifies; fall
@@ -130,22 +145,44 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* Inflow cards */}
+        {/* Hero: this week */}
+        <div className="bg-primary text-white rounded-xl p-6 sm:p-8 shadow-sm">
+          <p className="text-[11px] uppercase tracking-widest text-white/70 font-medium">
+            This week
+          </p>
+          <p className="font-serif text-5xl sm:text-6xl tnum mt-2 leading-none">
+            {formatNaira(totalKobo7d)}
+          </p>
+          <p className="text-sm text-white/80 mt-3 tnum">
+            {weekTxns.length} payment{weekTxns.length === 1 ? '' : 's'}
+            {deltaPct !== null && (
+              <>
+                {' · '}
+                <span className={deltaPct >= 0 ? 'text-white' : 'text-white/80'}>
+                  {deltaPct >= 0 ? '+' : ''}
+                  {deltaPct}% vs last week
+                </span>
+              </>
+            )}
+            {deltaPct === null && weekTxns.length > 0 && ' · First active week'}
+            {weekTxns.length === 0 && ' · No inflow yet this week'}
+          </p>
+        </div>
+
+        {/* Secondary inflow cards */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white border border-line rounded-lg p-5">
-            <p className="text-xs uppercase tracking-wide text-ink-muted">
-              This week
-            </p>
-            <p className="text-2xl font-semibold tnum mt-1">{formatNaira(totalKobo7d)}</p>
-            <p className="text-xs text-ink-muted mt-0.5 tnum">
-              {weekTxns.length} payment{weekTxns.length === 1 ? '' : 's'}
-            </p>
-          </div>
           <div className="bg-white border border-line rounded-lg p-5">
             <p className="text-xs uppercase tracking-wide text-ink-muted">Last 30 days</p>
             <p className="text-2xl font-semibold tnum mt-1">{formatNaira(totalKobo30d)}</p>
             <p className="text-xs text-ink-muted mt-0.5 tnum">
               {txns.length} payment{txns.length === 1 ? '' : 's'}
+            </p>
+          </div>
+          <div className="bg-white border border-line rounded-lg p-5">
+            <p className="text-xs uppercase tracking-wide text-ink-muted">Avg payment (7d)</p>
+            <p className="text-2xl font-semibold tnum mt-1">{formatNaira(avgKobo7d)}</p>
+            <p className="text-xs text-ink-muted mt-0.5">
+              {weekTxns.length > 0 ? 'Mean across this week' : 'Waiting for first payment'}
             </p>
           </div>
         </div>
