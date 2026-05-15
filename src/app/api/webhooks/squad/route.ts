@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { paymentProvider } from '@/lib/payments'
+import { categorizeTransaction } from '@/lib/ai/gemini'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -102,11 +103,11 @@ export async function POST(request: Request) {
   // back to virtual_account_number. The fallback matters for VAs created
   // before the seller existed in our DB (e.g. sandbox testing scripts) and
   // for any case where Squad's customer_identifier echoback doesn't match.
-  let seller: { id: string } | null = null
+  let seller: { id: string; business_description: string } | null = null
   if (parsed.customerIdentifier) {
     const { data } = await admin
       .from('sellers')
-      .select('id')
+      .select('id, business_description')
       .eq('squad_customer_identifier', parsed.customerIdentifier)
       .maybeSingle()
     seller = data
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
   if (!seller && parsed.virtualAccountNumber) {
     const { data } = await admin
       .from('sellers')
-      .select('id')
+      .select('id, business_description')
       .eq('squad_virtual_account_number', parsed.virtualAccountNumber)
       .maybeSingle()
     seller = data
@@ -199,6 +200,25 @@ export async function POST(request: Request) {
     parsed.amountKobo,
     'kobo',
   )
+
+  // 9. AI categorization — best-effort. Synchronous so the dashboard sees
+  // the category on the next load. Failure is non-fatal: the transaction
+  // is already saved.
+  try {
+    const category = await categorizeTransaction({
+      businessDescription: seller.business_description,
+      transactionDescription: description,
+    })
+    if (category) {
+      await admin
+        .from('transactions')
+        .update({ ai_category: category })
+        .eq('id', inserted.id)
+      console.log('[webhook] categorized:', inserted.id, '→', category)
+    }
+  } catch (err) {
+    console.warn('[webhook] categorization failed (non-fatal):', err)
+  }
 
   return NextResponse.json({ ok: true, transactionId: inserted.id })
 }
