@@ -43,6 +43,7 @@ This is the entire build. Everything outside this list is on slides, not in code
 - Tier upgrades (slide only)
 - Trust score computation (static number on dashboard, explanation on slide)
 - Marketplace browsing (slide only)
+- Vend Trending — weekly discovery/ranking surface (slide only; see §11/§12)
 - Collections feature (slide only)
 - Anti-fraud beyond Squad's built-in checks (slide only)
 - Embedded credit / lending partners (slide only — see Section 11)
@@ -249,17 +250,17 @@ Following the hackathon brief's exact structure. 10 slides max.
 | # | Slide | Content |
 |---|---|---|
 | 1 | Problem | Nigeria's invisible economy: informal businesses generating billions, invisible to financial system. Specific stat: 90%+ of campus businesses operate without formalization. Why now: youth unemployment + payment infrastructure maturity. |
-| 2 | Target User | The UNILAG braider making ₦200k/month from her hostel room. Real photo, real name (with permission), real quote from teammate's research. The income seeker, not the job seeker. |
-| 3 | Solution Overview | Vend: financial OS for informal merchants. Three-tier journey (Informal → Verified → Registered). Show the seven-step demo loop visually. |
+| 2 | Target User | The UNILAG braider making ₦200k/month from her hostel room. Real photo, real name (with permission), real quote from teammate's research. The income seeker, not the job seeker. Research validation lives here too — naira figures from real sellers, the "why now" convergence — so the user and the evidence land in the same beat. |
+| 3 | Solution Overview | Vend: financial OS for informal merchants. Three-tier journey (Informal → Verified → Registered). Show the seven-step demo loop visually. Marketplace shown as the discovery layer feature, not a separate product. |
 | 4 | Squad API Integration | Virtual accounts (each seller gets one), hosted checkout for payment collection, webhooks for real-time visibility. Show the architecture diagram. Emphasize: Squad isn't bolted on, it's the spine. |
-| 5 | AI / Data Intelligence | Claude categorizes every transaction. Claude generates dashboard summaries. AI signals feed the trust score. Setup-time vs runtime AI distinction (Section 3 of master context). |
-| 6 | User Flow | Walk through the demo loop — this is where we show the live demo. Five minutes. |
-| 7 | Impact Potential | UNILAG: ~50k students, ~5k active micro-merchants. Year 1 target: 1,000 onboarded. National scale: tens of millions in Nigeria's informal economy. Be specific with numbers. |
-| 8 | Scalability & Business Model | Payment processing fees, SaaS subscription for Verified+, registration services revenue, lending referral revenue (partner-based — see Section 12). Multi-campus playbook. |
-| 9 | Research & Validation | Teammate's UNILAG quotes. Naira figures from real sellers. The "why now" convergence. |
+| 5 | AI / Data Intelligence | Three concrete AI jobs: (a) transaction categorization on webhook ingest; (b) weekly dashboard summary; (c) Trending ranking + wash-trade detection. Setup-time vs runtime AI distinction (Section 3 of master context). AI doing work, not decoration. |
+| 6 | Vend Trending | Discovery infrastructure, not gamification. Two-column visual: "Top this week" (composite of review quality, sustained activity, trust score, tier bonus) and "Rising" (cold-start fairness — fastest growth from a low base). Weekly · per-campus · AI-verified. **Headline mechanic: tier bonus.** Registered sellers get a visibility multiplier — formalization is rewarded with discovery, not a badge. Ranking is interpretable; sellers see why they ranked where they did. Vend's second designed viral loop, alongside Collections. Launches month 6-9, slide-only for the hackathon. |
+| 7 | User Flow | Walk through the demo loop — this is where we show the live demo. Five minutes. |
+| 8 | Impact Potential | UNILAG: ~50k students, ~5k active micro-merchants. Year 1 target: 1,000 onboarded. National scale: tens of millions in Nigeria's informal economy. Trending tie-in: *"Trending turns 1,000 onboarded sellers into 1,000 sellers competing to do better work."* Year 1 isn't just a user count, it's a behavior-shaping system. |
+| 9 | Scalability & Business Model | Payment processing fees, SaaS subscription for Verified+, registration services revenue, lending referral revenue (partner-based — see Section 12). Marketplace + Trending as discovery infrastructure compounding seller acquisition. Multi-campus playbook. |
 | 10 | The Team | Solo founder + one teammate. Why this team: founder-goes-to-ground commitment, Lagos-based, building from inside the user's environment. |
 
-The brief's slide list has two slide-7s and two slide-8s in the document — I've collapsed them into a clean 10. If they hold us strictly to the original numbering on the day, we adjust live.
+The brief's slide list has two slide-7s and two slide-8s in the document — I've collapsed them into a clean 10. If they hold us strictly to the original numbering on the day, we adjust live. Research & Validation has been folded into the Target User slide so quotes and evidence land alongside the archetype, which makes room for the Trending slide without exceeding the 10-slide cap.
 
 ## 12. Future-product narrative for the pitch (not built)
 
@@ -270,10 +271,11 @@ These come up on slides only. Be ready to defend each:
 - **Collections.** Group-payment surface for treasurers, class reps, event organizers. Vend's viral growth loop. Drops dozens of payers into ecosystem per collection. Launches month 3-6 of real product.
 - **Lending partnerships.** Vend as origination layer; licensed lender takes credit risk. Candidates: Lendsqr, Indicina, Carbon's white-label, Mono. Year 2 unlock when ~1,000 Verified-tier sellers have ≥3 months data. Vend never holds the loan book itself — Section 5 of master context, "don't build what you can partner for."
 - **Marketplace.** Discovery layer with escrow + OTP-verified delivery. Feature of Vend, not its purpose. Sellers find buyers; buyers verify trust before paying. Settled — do not let questions drift toward "Vend as Chowdeck."
+- **Vend Trending.** Weekly, per-campus discovery surface within the marketplace. AI ranks sellers on a composite of review quality, sustained activity, trust score, and a tier bonus that weights Registered sellers higher — visibility becomes the economic carrot for formalization. Two axes: "Top this week" and "Rising" (the cold-start fairness mechanism). Vend's second designed viral loop alongside Collections; sellers tell their customers to leave reviews, customers visit Vend and discover other Trending sellers, ecosystem compounds. Ranking is interpretable per master context §3 — sellers see why they ranked where they did. Launches month 6-9, gated on trust-score data maturity, review volume, and marketplace UI launch.
 
 ## 13. Things I will be tempted to add and must not
 
-- Leaderboards, gamification, streaks, badges. (Vend is infrastructure, not entertainment — Section 5 of master context.)
+- Gamification, streaks, badges, surprise "achievements." (Vend is infrastructure, not entertainment — master context §5.) **Note:** discovery-ranking surfaces like Vend Trending are *not* gamification when they reward demonstrated effort with visibility — see master context §3 and §5 for the distinction. The line is: rewarding behavior tied to commerce (review quality, sustained activity, formalization) is infrastructure; rewarding streaks, novelty, or behavior unrelated to commerce is entertainment. Build the former.
 - A buyer-side service ordering flow ("order a haircut to your hostel"). This is Business A and we are not Business A.
 - Receipt template designer, font picker, drag-and-drop customization. Out of scope per receipt feature brief.
 - White-labeling. Vend attribution is non-removable.
@@ -320,7 +322,7 @@ Estimated current trajectory: 85+ if execution holds. The variables are user res
 - **GTBank settlement account.** Squad requires a GTBank account as settlement target for production. Sandbox: not needed (settles to wallet T+1). Real product: founder needs a GTBank business account in the LTD's name. Add to Section 8 master context.
 - **Email deliverability for receipts.** Resend free tier should be fine for demo volume but verify domain setup time.
 - **Demo Wi-Fi reliability on stage.** If venue has bad connectivity, have a recorded fallback demo per the brief: *"live is preferred, but a recorded walkthrough is accepted."*
-- **Bias/fairness slide content.** Need one substantive bullet — likely about ensuring the trust score doesn't disadvantage new sellers (cold-start fairness) and that AI categorization doesn't penalize unconventional business descriptions.
+- **AI categorization fairness.** Need to confirm Gemini doesn't penalize unconventional business descriptions when assigning categories. (Cold-start fairness for sellers is now handled structurally — see Resolved.)
 - **Payment links endpoint** (Squad Payments docs, not yet read). Worth fetching to confirm whether the demo needs them at all, or if virtual account + simulate-payment is enough.
 
 **Resolved:**
@@ -333,6 +335,7 @@ Estimated current trajectory: 85+ if execution holds. The variables are user res
 - **`beneficiary_account` is required by sandbox** despite docs saying optional. Dummy GTBank-shaped number (`0000000000`) is accepted in sandbox. Production will require a real GTBank account; for Vend post-LTD, this becomes Vend's own LTD GTBank settlement account, with internal redistribution by `customer_identifier`. ✓
 - **Email field validates basic format** — sandbox rejects `.local` TLDs and similar. Use real-format emails (e.g. `@example.com`) for test data. ✓
 - **First successful virtual account created May 8, 2026.** Phase 1 complete. ✓
+- **Bias/fairness — cold-start for new sellers.** Resolved structurally by Vend Trending's two-axis design (§11/§12): "Rising" sits alongside "Top this week," giving new sellers a visibility path that doesn't require volume. Cold-start fairness is now a property of the ranking surface, not a slide bullet bolted on. ✓
 
 ## 16. After the hackathon
 
