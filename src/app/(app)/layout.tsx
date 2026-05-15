@@ -28,9 +28,9 @@ export default async function AppLayout({
   if (!seller) redirect('/signup')
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen">
       <Sidebar seller={seller} />
-      <div className="flex-1 min-w-0">
+      <div className="lg:pl-60">
         <main className="p-6 sm:p-10 max-w-5xl">{children}</main>
       </div>
     </div>

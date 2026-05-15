@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient as createBrowserClient } from '@/lib/supabase-browser'
@@ -22,8 +23,24 @@ const NAV_V2 = [
   { href: '/trust', label: 'Trust & Verification', icon: IconShield },
 ]
 
+const STORAGE_KEY = 'vend.sidebar.collapsed'
+
 export default function Sidebar({ seller }: { seller: SellerSummary }) {
   const pathname = usePathname()
+  const [collapsed, setCollapsed] = useState(false)
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+    if (stored === '1') setCollapsed(true)
+  }, [])
+
+  function toggle() {
+    setCollapsed((prev) => {
+      const next = !prev
+      window.localStorage.setItem(STORAGE_KEY, next ? '1' : '0')
+      return next
+    })
+  }
 
   async function signOut() {
     const supabase = createBrowserClient()
@@ -32,16 +49,54 @@ export default function Sidebar({ seller }: { seller: SellerSummary }) {
   }
 
   return (
-    <aside className="hidden lg:flex lg:flex-col w-60 shrink-0 bg-primary text-white">
-      <div className="px-6 py-5 border-b border-white/10">
-        <Link href="/dashboard" className="font-serif text-2xl text-white tracking-tight">
-          Vend
-        </Link>
-        <p className="text-xs text-white/60 mt-0.5">Financial OS · Beta</p>
-      </div>
+    <aside
+      className={[
+        'hidden lg:flex lg:flex-col fixed inset-y-0 left-0 z-30 bg-primary text-white transition-[width] duration-200 ease-out',
+        collapsed ? 'w-16' : 'w-60',
+      ].join(' ')}
+    >
+      {collapsed ? (
+        <div className="border-b border-white/10 px-3 py-5 flex flex-col items-center gap-3">
+          <Link
+            href="/dashboard"
+            className="font-serif text-2xl text-white tracking-tight"
+            title="Vend"
+          >
+            V
+          </Link>
+          <button
+            onClick={toggle}
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+            className="p-1.5 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <IconChevron className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="border-b border-white/10 px-6 py-5 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <Link
+              href="/dashboard"
+              className="font-serif text-2xl text-white tracking-tight"
+            >
+              Vend
+            </Link>
+            <p className="text-xs text-white/60 mt-0.5">Financial OS · Beta</p>
+          </div>
+          <button
+            onClick={toggle}
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+            className="p-1.5 -mr-1 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+          >
+            <IconChevron className="w-4 h-4 rotate-180" />
+          </button>
+        </div>
+      )}
 
-      <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
-        <Section>
+      <nav className={['flex-1 py-4 space-y-6 overflow-y-auto', collapsed ? 'px-2' : 'px-3'].join(' ')}>
+        <Section collapsed={collapsed}>
           {NAV_ACTIVE.map((item) => (
             <NavLink
               key={item.href}
@@ -49,11 +104,12 @@ export default function Sidebar({ seller }: { seller: SellerSummary }) {
               label={item.label}
               icon={item.icon}
               active={pathname === item.href || pathname.startsWith(item.href + '/')}
+              collapsed={collapsed}
             />
           ))}
         </Section>
 
-        <Section title="Coming in v2">
+        <Section title="Coming in v2" collapsed={collapsed}>
           {NAV_V2.map((item) => (
             <NavLink
               key={item.href}
@@ -62,41 +118,71 @@ export default function Sidebar({ seller }: { seller: SellerSummary }) {
               icon={item.icon}
               active={pathname === item.href}
               badge="v2"
+              collapsed={collapsed}
             />
           ))}
         </Section>
       </nav>
 
-      <div className="px-4 py-4 border-t border-white/10">
-        <p className="text-xs text-white/50 uppercase tracking-wide">Signed in as</p>
-        <p className="font-medium text-sm mt-0.5 truncate text-white">{seller.business_name}</p>
-        <div className="flex items-center gap-1.5 mt-1.5">
-          <span className="text-[10px] uppercase tracking-wide bg-white/10 text-white px-1.5 py-0.5 rounded font-medium">
-            {seller.tier}
-          </span>
-          <span className="text-[10px] uppercase tracking-wide bg-white text-primary px-1.5 py-0.5 rounded font-medium tnum">
-            {Number(seller.trust_score ?? 0).toFixed(1)}
-          </span>
-        </div>
-        <button
-          onClick={signOut}
-          className="mt-3 text-xs text-white/60 hover:text-white transition-colors"
-        >
-          Sign out
-        </button>
+      <div className={['border-t border-white/10', collapsed ? 'px-2 py-3' : 'px-4 py-4'].join(' ')}>
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2">
+            <span
+              className="text-[10px] uppercase tracking-wide bg-white text-primary px-1.5 py-0.5 rounded font-medium tnum"
+              title={`${seller.business_name} · ${seller.tier}`}
+            >
+              {Number(seller.trust_score ?? 0).toFixed(1)}
+            </span>
+            <button
+              onClick={signOut}
+              title="Sign out"
+              className="p-1.5 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <IconSignOut className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-white/50 uppercase tracking-wide">Signed in as</p>
+            <p className="font-medium text-sm mt-0.5 truncate text-white">{seller.business_name}</p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="text-[10px] uppercase tracking-wide bg-white/10 text-white px-1.5 py-0.5 rounded font-medium">
+                {seller.tier}
+              </span>
+              <span className="text-[10px] uppercase tracking-wide bg-white text-primary px-1.5 py-0.5 rounded font-medium tnum">
+                {Number(seller.trust_score ?? 0).toFixed(1)}
+              </span>
+            </div>
+            <button
+              onClick={signOut}
+              className="mt-3 text-xs text-white/60 hover:text-white transition-colors"
+            >
+              Sign out
+            </button>
+          </>
+        )}
       </div>
     </aside>
   )
 }
 
-function Section({ title, children }: { title?: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  collapsed,
+}: {
+  title?: string
+  children: React.ReactNode
+  collapsed: boolean
+}) {
   return (
     <div>
-      {title && (
+      {title && !collapsed && (
         <p className="px-3 mb-1.5 text-[10px] uppercase tracking-widest text-white/40 font-medium">
           {title}
         </p>
       )}
+      {title && collapsed && <div className="mx-2 mb-1.5 h-px bg-white/10" />}
       <ul className="space-y-0.5">{children}</ul>
     </div>
   )
@@ -108,30 +194,38 @@ function NavLink({
   icon: Icon,
   active,
   badge,
+  collapsed,
 }: {
   href: string
   label: string
   icon: React.ComponentType<{ className?: string }>
   active: boolean
   badge?: string
+  collapsed: boolean
 }) {
   return (
     <li>
       <Link
         href={href}
+        title={collapsed ? (badge ? `${label} (${badge})` : label) : undefined}
         className={[
-          'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
+          'flex items-center rounded-md text-sm transition-colors',
+          collapsed ? 'justify-center px-2 py-2' : 'gap-2.5 px-3 py-2',
           active
             ? 'bg-white text-primary font-medium'
             : 'text-white/70 hover:bg-white/10 hover:text-white',
         ].join(' ')}
       >
         <Icon className="w-4 h-4 shrink-0" />
-        <span className="flex-1 truncate">{label}</span>
-        {badge && (
-          <span className="text-[9px] uppercase tracking-wider bg-white/15 text-white/70 px-1.5 py-0.5 rounded">
-            {badge}
-          </span>
+        {!collapsed && (
+          <>
+            <span className="flex-1 truncate">{label}</span>
+            {badge && (
+              <span className="text-[9px] uppercase tracking-wider bg-white/15 text-white/70 px-1.5 py-0.5 rounded">
+                {badge}
+              </span>
+            )}
+          </>
         )}
       </Link>
     </li>
@@ -192,6 +286,24 @@ function IconShield({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2L4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3z" />
       <path d="M9 12l2 2 4-4" />
+    </svg>
+  )
+}
+
+function IconChevron({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  )
+}
+
+function IconSignOut({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
     </svg>
   )
 }
